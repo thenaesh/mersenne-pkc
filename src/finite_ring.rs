@@ -2,8 +2,8 @@ use std::ops::Add;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct FiniteRing {
-    modulus: u64,
-    val: u64,
+    pub modulus: u64,
+    pub val: u64,
 }
 
 impl FiniteRing {
