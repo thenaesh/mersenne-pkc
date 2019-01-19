@@ -1,13 +1,13 @@
 use std::ops::Add;
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct FiniteRing {
-    pub modulus: u64,
-    pub val: u64,
+    pub modulus: usize,
+    pub val: usize,
 }
 
 impl FiniteRing {
-    pub fn new(modulus: u64, val: u64) -> Self {
+    pub fn new(modulus: usize, val: usize) -> Self {
         let mut corrected_val = val;
 
         while corrected_val >= modulus {
@@ -41,19 +41,19 @@ mod tests {
     #[test]
     fn new_val_remains_unchanged_if_less_than_modulus() {
         let x = FiniteRing::new(3425, 2544);
-        assert_eq!(x.val, 2544 as u64);
+        assert_eq!(x.val, 2544);
     }
 
     #[test]
     fn new_val_changes_if_greater_than_modulus_but_less_than_2_modulus() {
         let x = FiniteRing::new(42, 76);
-        assert_eq!(x.val, 34 as u64);
+        assert_eq!(x.val, 34);
     }
 
     #[test]
     fn new_val_changes_if_greater_than_modulus_but_less_than_5_modulus() {
         let x = FiniteRing::new(32, 137);
-        assert_eq!(x.val, 9 as u64);
+        assert_eq!(x.val, 9);
     }
 
     #[test]
