@@ -4,8 +4,8 @@ use std::iter::IntoIterator;
 use std::cmp::PartialEq;
 use std::str::FromStr;
 use std::fmt::Display;
-use std::ops::Add;
-use std::ops::{ShlAssign, ShrAssign};
+use std::ops::{Add, Sub, Mul, Div};
+use std::ops::{AddAssign, SubAssign, MulAssign, DivAssign, ShlAssign, ShrAssign};
 
 use crate::finite_ring::FiniteRing;
 
@@ -87,6 +87,28 @@ impl MersenneField {
             self.bits[i] = false;
         }
     }
+
+    fn complement(self: &Self) -> MersenneField {
+        let mut field = MersenneField::new(self.n);
+        for i in 0..self.n {
+            field.bits[i] = !self.bits[i];
+        }
+        field
+    }
+
+    fn ones(n: usize) -> MersenneField {
+        let mut field = MersenneField::new(n);
+        for i in 0..n {
+            field.bits[i] = true;
+        }
+        field
+    }
+
+    fn one(n: usize) -> MersenneField {
+        let mut field = MersenneField::new(n);
+        field.bits[0] = true;
+        field
+    }
 }
 
 impl FromStr for MersenneField {
@@ -144,12 +166,10 @@ impl PartialEq<&str> for MersenneField {
     }
 }
 
-impl<'a> Add for &'a MersenneField {
-    type Output = Result<MersenneField, &'static str>;
-
-    fn add(self: Self, other: Self) -> Self::Output {
+impl<'a> AddAssign<&'a MersenneField> for MersenneField {
+    fn add_assign(self: &mut Self, other: &Self) {
         if self.n != other.n {
-            return Result::Err("Mismatched bit vector lengths!");
+            panic!("Mismatched bit vector lengths!")
         }
 
         let mut result = MersenneField::new(self.n);
@@ -170,11 +190,124 @@ impl<'a> Add for &'a MersenneField {
         if carry_and_bit.0 {
             let mut one_field = MersenneField::new(self.n);
             one_field.bits[0] = true;
-            result = (&result + &one_field).unwrap();
+            result += &one_field;
         }
 
         result.zero_if_all_one();
-        Result::Ok(result)
+
+        self.bits = result.bits;
+        self.offset = result.offset;
+    }
+}
+
+impl<'a> SubAssign<&'a MersenneField> for MersenneField {
+    fn sub_assign(self: &mut Self, other: &Self) {
+        if self.n != other.n {
+            panic!("Mismatched bit vector lengths!")
+        }
+
+        let mut result = MersenneField::new(self.n);
+        let mut neg_other = MersenneField::new(self.n);
+        let ones = MersenneField::ones(self.n);
+        let one = MersenneField::one(self.n);
+
+        // compute the negation of other, without modulo arithmetic, using method of complements
+        let mut carry_and_bit = (false, false);
+        for (i, (a,b)) in ones.into_iter().zip(other.complement().into_iter()).enumerate() {
+            carry_and_bit = match (carry_and_bit.0, a, b) {
+                (false, _, _) => (a && b, a != b),
+                (true, false, false) => (false, true),
+                (true, false, true) => (true, false),
+                (true, true, false) => (true, false),
+                (true, true, true) => (true, true),
+            };
+
+            neg_other.bits[i] = carry_and_bit.1;
+        }
+        carry_and_bit = (false, false);
+        for (i, (a,b)) in neg_other.into_iter().zip(one.into_iter()).enumerate() {
+            carry_and_bit = match (carry_and_bit.0, a, b) {
+                (false, _, _) => (a && b, a != b),
+                (true, false, false) => (false, true),
+                (true, false, true) => (true, false),
+                (true, true, false) => (true, false),
+                (true, true, true) => (true, true),
+            };
+
+            result.bits[i] = carry_and_bit.1;
+        }
+
+        result.zero_if_all_one();
+        result += self;
+
+        self.bits = result.bits;
+        self.offset = result.offset;
+    }
+}
+
+impl<'a> MulAssign<&'a MersenneField> for MersenneField {
+    fn mul_assign(self: &mut Self, other: &Self) {
+        if self.n != other.n {
+            panic!("Mismatched bit vector lengths!")
+        }
+
+        let mut result = MersenneField::new(self.n);
+        let mut other_buffer = other.clone();
+
+        for (i, bit) in self.into_iter().enumerate() {
+            if bit {
+                other_buffer <<= i;
+                result += &other_buffer;
+                other_buffer >>= i;
+            }
+        }
+
+        self.bits = result.bits;
+        self.offset = result.offset;
+    }
+}
+
+impl<'a> DivAssign<&'a MersenneField> for MersenneField {
+    /*
+     * by Fermat's Little Theorem, x/y = x * y^(p-2) = x * y^(2^n - 3)
+     * we setup an exponent that we subtract from and shift for fast exponentiation
+     *
+     * NOTE: 2^n - 1 MUST BE PRIME, OTHERWISE THIS WILL BE WRONG!
+     */
+    fn div_assign(self: &mut Self, other: &Self) {
+        if self.n != other.n {
+            panic!("Mismatched bit vector lengths!")
+        }
+
+        let n = self.n;
+
+        let mut result = self.clone();
+        let mut base = other.clone();
+
+        let mut exponent: Vec<bool> = Vec::with_capacity(n);
+        let mut idx = 0;
+
+        // setting exponent to 2^n - 1
+        for _ in 0..n {
+            exponent.push(true);
+        }
+        // subtracting 2 from exponent
+        exponent[1] = false;
+
+        // fast exponentiation
+        while idx < n {
+            if exponent[idx] {
+                result *= &base;
+                exponent[idx] = false;
+            } else {
+                let tmp_base = base.clone();
+                base *= &tmp_base;
+                idx += 1; // perform shift right on the exponent
+            }
+        }
+
+        self.bits = result.bits;
+        self.offset = result.offset;
     }
 }
 
@@ -415,23 +548,89 @@ mod tests {
     }
 
     #[test]
-    fn add_different_length_should_error() {
-        let x = "1001".parse::<MersenneField>().unwrap();
-        let y = "10010".parse::<MersenneField>().unwrap();
-        (&x + &y).expect_err("Unexpected successful addition of two MersenneFields of unequal length!");
-    }
-
-    #[test]
-    fn add_without_overflow() {
-        let x = "101".parse::<MersenneField>().unwrap();
+    fn add_assign_without_overflow() {
+        let mut x = "101".parse::<MersenneField>().unwrap();
         let y = "001".parse::<MersenneField>().unwrap();
-        assert_eq!((&x + &y).unwrap(), "110");
+        x += &y;
+        assert_eq!(x, "110");
     }
 
     #[test]
-    fn add_with_overflow() {
-        let x = "101".parse::<MersenneField>().unwrap();
+    fn add_assign_with_overflow() {
+        let mut x = "101".parse::<MersenneField>().unwrap();
         let y = "110".parse::<MersenneField>().unwrap();
-        assert_eq!((&x + &y).unwrap(), "100");
+        x += &y;
+        assert_eq!(x, "100");
+    }
+
+    #[test]
+    fn sub_assign_without_overflow() {
+        let mut x = "101".parse::<MersenneField>().unwrap();
+        let y = "010".parse::<MersenneField>().unwrap();
+        x -= &y;
+        assert_eq!(x, "011");
+        let mut z = "11001".parse::<MersenneField>().unwrap();
+        let w = "10011".parse::<MersenneField>().unwrap();
+        z -= &w;
+        assert_eq!(z, "00110");
+    }
+
+    #[test]
+    fn sub_assign_with_overflow() {
+        let mut x = "001".parse::<MersenneField>().unwrap();
+        let y = "101".parse::<MersenneField>().unwrap();
+        x -= &y;
+        assert_eq!(x, "011");
+        let mut z = "01001".parse::<MersenneField>().unwrap();
+        let w = "10011".parse::<MersenneField>().unwrap();
+        z -= &w;
+        assert_eq!(z, "10101");
+    }
+
+    #[test]
+    fn mul_without_offset() {
+        let mut x = "0011".parse::<MersenneField>().unwrap();
+        let y = "0010".parse::<MersenneField>().unwrap();
+        x *= &y;
+        assert_eq!(x, "0110");
+    }
+
+    #[test]
+    fn mul_with_offset() {
+        let mut x = "0110".parse::<MersenneField>().unwrap();
+        let y = "0011".parse::<MersenneField>().unwrap();
+        x *= &y;
+        assert_eq!(x, "0011");
+
+        let mut z = "1001".parse::<MersenneField>().unwrap();
+        let w = "0111".parse::<MersenneField>().unwrap();
+        z *= &w;
+        assert_eq!(z, "0011");
+    }
+
+    #[test]
+    fn div_without_offset() {
+        let mut x = "110".parse::<MersenneField>().unwrap();
+        let y = "011".parse::<MersenneField>().unwrap();
+        x /= &y;
+        assert_eq!(x, "010");
+
+        let mut z = "11000".parse::<MersenneField>().unwrap();
+        let w = "00100".parse::<MersenneField>().unwrap();
+        z /= &w;
+        assert_eq!(z, "00110");
+    }
+
+    #[test]
+    fn div_with_offset() {
+        let mut x = "110".parse::<MersenneField>().unwrap();
+        let y = "100".parse::<MersenneField>().unwrap();
+        x /= &y;
+        assert_eq!(x, "101");
+
+        let mut z = "11001".parse::<MersenneField>().unwrap();
+        let w = "10011".parse::<MersenneField>().unwrap();
+        z /= &w;
+        assert_eq!(z, "10000");
     }
 }
