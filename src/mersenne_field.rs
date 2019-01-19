@@ -96,6 +96,10 @@ impl MersenneField {
         field
     }
 
+    pub fn hamming_weight(self: &Self) -> usize {
+        self.into_iter().filter(|x| *x).count()
+    }
+
     fn ones(n: usize) -> MersenneField {
         let mut field = MersenneField::new(n);
         for i in 0..n {
@@ -632,5 +636,17 @@ mod tests {
         let w = "10011".parse::<MersenneField>().unwrap();
         z /= &w;
         assert_eq!(z, "10000");
+    }
+
+    #[test]
+    fn hamming_weight() {
+        let x = "110".parse::<MersenneField>().unwrap();
+        let y = "11101010".parse::<MersenneField>().unwrap();
+        let z = "11000111010101".parse::<MersenneField>().unwrap();
+        let w = "1101111".parse::<MersenneField>().unwrap();
+        assert_eq!(x.hamming_weight(), 2);
+        assert_eq!(y.hamming_weight(), 5);
+        assert_eq!(z.hamming_weight(), 8);
+        assert_eq!(w.hamming_weight(), 6);
     }
 }
