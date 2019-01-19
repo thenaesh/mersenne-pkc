@@ -1,4 +1,5 @@
-use std::ops::Add;
+use std::ops::{Add, Sub};
+use std::ops::Neg;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct FiniteRing {
@@ -18,6 +19,14 @@ impl FiniteRing {
     }
 }
 
+impl Neg for FiniteRing {
+    type Output = FiniteRing;
+
+    fn neg(self: Self) -> Self::Output {
+        FiniteRing::new(self.modulus, self.modulus - self.val)
+    }
+}
+
 impl Add<FiniteRing> for FiniteRing {
     type Output = Option<FiniteRing>;
 
@@ -30,6 +39,14 @@ impl Add<FiniteRing> for FiniteRing {
         if sum >= self.modulus { sum = sum - self.modulus; }
 
         Option::Some(FiniteRing { modulus: self.modulus, val: sum })
+    }
+}
+
+impl Sub<FiniteRing> for FiniteRing {
+    type Output = Option<FiniteRing>;
+
+    fn sub(self, other: FiniteRing) -> Self::Output {
+        self + (-other)
     }
 }
 
@@ -54,6 +71,17 @@ mod tests {
     fn new_val_changes_if_greater_than_modulus_but_less_than_5_modulus() {
         let x = FiniteRing::new(32, 137);
         assert_eq!(x.val, 9);
+    }
+
+    #[test]
+    fn neg() {
+        let x = FiniteRing::new(32, 18);
+        let y = FiniteRing::new(32, 14);
+        let z = FiniteRing::new(32, 0);
+
+        assert_eq!(-x, y);
+        assert_eq!(x, -y);
+        assert_eq!(-z, z);
     }
 
     #[test]
