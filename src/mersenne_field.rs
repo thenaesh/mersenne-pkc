@@ -6,13 +6,14 @@ use std::str::FromStr;
 use std::fmt::Display;
 use std::ops::{Add, Sub, Mul, Div};
 use std::ops::{AddAssign, SubAssign, MulAssign, DivAssign, ShlAssign, ShrAssign};
+use rand::Rng;
 
 use crate::finite_ring::FiniteRing;
 
 #[derive(Debug, Clone)]
 pub struct MersenneField {
     n: usize,
-    bits: Vec<bool>,
+    pub bits: Vec<bool>,
     offset: FiniteRing,
 }
 
@@ -65,6 +66,28 @@ impl MersenneField {
         }
 
         field
+    }
+
+    pub fn new_uniform_random(n: usize, hamming_weight: usize) -> Self {
+        let mut rng = rand::thread_rng();
+        let mut field = MersenneField::new(n);
+
+        let mut i = 0;
+        while i < hamming_weight {
+            let rand_idx = rng.gen::<usize>() % n;
+            if field.bits[rand_idx] {
+                continue;
+            } else {
+                i += 1;
+                field.bits[rand_idx] = true;
+            }
+        }
+
+        field
+    }
+
+    pub fn len(self: &Self) -> usize {
+        self.n
     }
 
     pub fn rotate(self: &mut Self, k: FiniteRing) {
@@ -648,5 +671,13 @@ mod tests {
         assert_eq!(y.hamming_weight(), 5);
         assert_eq!(z.hamming_weight(), 8);
         assert_eq!(w.hamming_weight(), 6);
+    }
+
+    #[test]
+    fn new_uniform_random() {
+        for _ in 0..10000 {
+            let x = MersenneField::new_uniform_random(128, 34);
+            assert_eq!(x.hamming_weight(), 34);
+        }
     }
 }
