@@ -2,8 +2,8 @@ use mersennepkc::*;
 use mersennepkc::mersenne_field::MersenneField;
 
 fn main() {
-    let n = 17;
-    let h = 5;
+    let n = 5;
+    let h = 2;
 
     let (f, g) = randomly_generate_message(n, h);
     println!("F, G: {}, {}", f.to_string(), g.to_string());

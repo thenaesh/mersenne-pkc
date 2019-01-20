@@ -57,7 +57,7 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     }
 
     while g_indices.len() < h {
-        let vec = pick_smallest_subtraction_powers(&z, &f);
+        let vec = pick_smallest_subtraction_powers(&z, &g);
         let mut i = 0;
         let mut p = &vec[i];
         while g_indices.contains(&p.0) {
@@ -100,14 +100,16 @@ fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField) -> Vec
             let mut ss = s.clone();
             ss <<= i;
             d_i -= &ss;
-            d_i
+            (ss, d_i)
         })
         .enumerate()
-        .collect::<Vec<(usize, MersenneField)>>();
+        .collect::<Vec<(usize, (MersenneField, MersenneField))>>();
 
-        subtraction_powers_and_values.sort_by_key(|(_, field)| field.hamming_weight());
-        let diffs: Vec<(usize, i64)> = subtraction_powers_and_values.iter().map(|(idx, field)| (*idx, field.hamming_weight() as i64)).collect();
+        subtraction_powers_and_values.sort_by_key(|(_, (_, field))| field.hamming_weight());
+        let diffs: Vec<(String, String, usize, i64)> = subtraction_powers_and_values.iter().map(|(idx, (delta, field))| (delta.to_string(), field.to_string(), *idx, field.hamming_weight() as i64)).collect();
+        println!("S: {}", s.to_string());
+        println!("Z: {}, Hamming Weight: {}", z.to_string(), z.hamming_weight());
         println!("Diffs: {:?}", diffs);
 
-        subtraction_powers_and_values
+        subtraction_powers_and_values.iter().map(|(idx, (delta, field))| (*idx, field.clone())).collect()
 }
