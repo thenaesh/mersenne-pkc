@@ -110,10 +110,16 @@ impl MersenneField {
         }
     }
 
-    fn zero_if_all_one(self: &mut Self) {
-        let is_all_one = (&self).into_iter().fold(true, |acc, x| acc && x);
+    fn is_all_zero(self: &Self) -> bool {
+        !self.into_iter().fold(false, |acc, x| acc || x)
+    }
 
-        if !is_all_one {
+    fn is_all_one(self: &Self) -> bool {
+        self.into_iter().fold(true, |acc, x| acc && x)
+    }
+
+    fn zero_if_all_one(self: &mut Self) {
+        if !self.is_all_one() {
             return;
         }
 
