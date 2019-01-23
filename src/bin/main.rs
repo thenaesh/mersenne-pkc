@@ -1,9 +1,8 @@
 use mersennepkc::*;
-use mersennepkc::mersenne_field::MersenneField;
 
 fn main() {
-    let n = 5;
-    let h = 2;
+    let n = 127;
+    let h = 5;
 
     let (f, g) = randomly_generate_message(n, h);
     println!("F, G: {}, {}", f.to_string(), g.to_string());
@@ -13,10 +12,14 @@ fn main() {
 
     let pri_key = (f, g);
 
-    let (a, b) = randomly_generate_message(n, h);
-    println!("Original Plaintext: {}, {}", a.to_string(), b.to_string());
+    let msg = randomly_generate_message(n, h);
+    let (a,b) = msg.clone();
 
-    let c = encrypt((a, b), pub_key, h);
+    let c = encrypt(msg, pub_key, h);
     let (aa, bb) = decrypt(c, pri_key, h);
-    println!("Original Plaintext: {}, {}", aa.to_string(), bb.to_string());
+
+    println!("Original A Bits : {:?}", a.set_bits());
+    println!("Decrypted A Bits: {:?}", aa.set_bits());
+    println!("Original B Bits : {:?}", b.set_bits());
+    println!("Decrypted B Bits: {:?}", bb.set_bits());
 }

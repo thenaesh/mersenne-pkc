@@ -90,6 +90,18 @@ impl MersenneField {
         self.n
     }
 
+    pub fn set_bits(self: &Self) -> Vec<usize> {
+        let mut vec: Vec<usize> = Vec::new();
+        for i in 0..self.n {
+            if !self.bits[i] {
+                continue;
+            }
+            let j = (FiniteRing::new(self.n, i) - self.offset).unwrap().val;
+            vec.push(j);
+        }
+        vec
+    }
+
     pub fn rotate(self: &mut Self, k: FiniteRing) {
         if let Some(result) = self.offset + k {
             self.offset = result;
@@ -116,6 +128,7 @@ impl MersenneField {
         for i in 0..self.n {
             field.bits[i] = !self.bits[i];
         }
+        field.offset = self.offset;
         field
     }
 
@@ -591,6 +604,15 @@ mod tests {
     }
 
     #[test]
+    fn add_rotated_value() {
+        let mut x = "10101".parse::<MersenneField>().unwrap();
+        let mut y = "00011".parse::<MersenneField>().unwrap();
+        y <<= 1;
+        x += &y;
+        assert_eq!(x, "11011");
+    }
+
+    #[test]
     fn sub_assign_without_overflow() {
         let mut x = "101".parse::<MersenneField>().unwrap();
         let y = "010".parse::<MersenneField>().unwrap();
@@ -612,6 +634,19 @@ mod tests {
         let w = "10011".parse::<MersenneField>().unwrap();
         z -= &w;
         assert_eq!(z, "10101");
+        let mut z = "10101".parse::<MersenneField>().unwrap();
+        let w = "00101".parse::<MersenneField>().unwrap();
+        z -= &w;
+        assert_eq!(z, "10000");
+    }
+
+    #[test]
+    fn sub_rotated_value() {
+        let mut x = "10101".parse::<MersenneField>().unwrap();
+        let mut y = "10010".parse::<MersenneField>().unwrap();
+        y <<= 1;
+        x -= &y;
+        assert_eq!(x, "10000");
     }
 
     #[test]

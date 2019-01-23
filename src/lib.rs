@@ -48,11 +48,6 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
         }
         let (idx, field) = p;
         z = field.clone();
-        /*
-        if f_indices.contains(&idx) {
-            continue;
-        }
-        */
         f_indices.push(idx.clone());
     }
 
@@ -69,11 +64,6 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
         }
         let (idx, field) = p;
         z = field.clone();
-        /*
-        if g_indices.contains(&idx) {
-            continue;
-        }
-        */
         g_indices.push(idx.clone());
     }
 
@@ -94,22 +84,27 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
 fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField) -> Vec<(usize, MersenneField)> {
     let n = z.len();
 
+    println!("Computations for {} - {} * 2^i", z.to_string(), s.to_string());
     let mut subtraction_powers_and_values = (0..n)
         .map(|i| {
             let mut d_i = z.clone();
             let mut ss = s.clone();
             ss <<= i;
             d_i -= &ss;
-            (ss, d_i)
+            println!("{} - {} * 2^{} = {} - {} = {}, Hamming Weight: {}",
+                z.to_string(),
+                s.to_string(),
+                i,
+                z.to_string(),
+                ss.to_string(),
+                d_i.to_string(),
+                d_i.hamming_weight());
+            d_i
         })
         .enumerate()
-        .collect::<Vec<(usize, (MersenneField, MersenneField))>>();
+        .collect::<Vec<(usize, MersenneField)>>();
+    println!("");
 
-        subtraction_powers_and_values.sort_by_key(|(_, (_, field))| field.hamming_weight());
-        let diffs: Vec<(String, String, usize, i64)> = subtraction_powers_and_values.iter().map(|(idx, (delta, field))| (delta.to_string(), field.to_string(), *idx, field.hamming_weight() as i64)).collect();
-        println!("S: {}", s.to_string());
-        println!("Z: {}, Hamming Weight: {}", z.to_string(), z.hamming_weight());
-        println!("Diffs: {:?}", diffs);
-
-        subtraction_powers_and_values.iter().map(|(idx, (delta, field))| (*idx, field.clone())).collect()
+    subtraction_powers_and_values.sort_by_key(|(_, field)| field.hamming_weight());
+    subtraction_powers_and_values
 }
