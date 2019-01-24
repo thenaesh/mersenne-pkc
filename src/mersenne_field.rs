@@ -1,7 +1,8 @@
+use core::cmp::Ordering;
 use std::vec::Vec;
 use std::iter::Iterator;
 use std::iter::IntoIterator;
-use std::cmp::PartialEq;
+use std::cmp::{PartialEq, Eq, PartialOrd};
 use std::str::FromStr;
 use std::fmt::Display;
 use std::ops::{Add, Sub, Mul, Div};
@@ -102,7 +103,7 @@ impl MersenneField {
         vec
     }
 
-    pub fn rotate(self: &mut Self, k: FiniteRing) {
+    fn rotate(self: &mut Self, k: FiniteRing) {
         if let Some(result) = self.offset + k {
             self.offset = result;
         } else {
@@ -110,8 +111,27 @@ impl MersenneField {
         }
     }
 
-    fn is_all_zero(self: &Self) -> bool {
+    fn shift_right_one_noncyclic(self: &mut Self) {
+        self.bits[self.offset.val] = false;
+        self.offset = (self.offset + FiniteRing::new(self.n, 1)).unwrap();
+    }
+
+    fn is_odd(self: &Self) -> bool {
+        self.bits[self.offset.val]
+    }
+
+    fn is_even(self: &Self) -> bool {
+        !self.is_odd()
+    }
+
+    fn is_zero(self: &Self) -> bool {
         !self.into_iter().fold(false, |acc, x| acc || x)
+    }
+
+    fn is_one(self: &Self) -> bool {
+        let mut iter = self.into_iter();
+        let first = iter.next().unwrap();
+        first && !iter.fold(false, |acc, x| acc || x)
     }
 
     fn is_all_one(self: &Self) -> bool {
@@ -154,6 +174,38 @@ impl MersenneField {
         let mut field = MersenneField::new(n);
         field.bits[0] = true;
         field
+    }
+
+    fn zero(n: usize) -> MersenneField {
+        MersenneField::new(n)
+    }
+
+    fn add_and_div_by_2_assign(self: &mut Self, other: &Self) {
+        if self.n != other.n {
+            panic!("Mismatched bit vector lengths!")
+        }
+
+        let mut result: Vec<bool> = Vec::with_capacity(self.n + 1);
+
+        let mut carry_and_bit = (false, false);
+        for (i, (a,b)) in self.into_iter().zip(other.into_iter()).enumerate() {
+            carry_and_bit = match (carry_and_bit.0, a, b) {
+                (false, _, _) => (a && b, a != b),
+                (true, false, false) => (false, true),
+                (true, false, true) => (true, false),
+                (true, true, false) => (true, false),
+                (true, true, true) => (true, true),
+            };
+
+            result.push(carry_and_bit.1);
+        }
+        result.push(carry_and_bit.0);
+
+        // division by 2 (i.e. right shifting by 1) happens implicitly here
+        for i in 0..self.n {
+            self.bits[i] = result[i+1];
+        }
+        self.offset = FiniteRing::new(self.n, 0);
     }
 }
 
@@ -208,6 +260,45 @@ impl PartialEq<&str> for MersenneField {
                 .map(|x| if x { '1' } else { '0' })
                 .zip(bitstring.chars().rev())
                 .fold(true, |acc, (a,b)| acc && a == b)
+        }
+    }
+}
+
+impl PartialEq for MersenneField {
+    fn eq(self: &Self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            false
+        } else {
+            self.into_iter()
+                .zip(other.into_iter())
+                .fold(true, |acc, (a,b)| acc && a == b)
+        }
+    }
+}
+impl Eq for MersenneField {}
+
+impl PartialOrd for MersenneField {
+    fn partial_cmp(self: &Self, other: &Self) -> Option<Ordering> {
+        return if self.n != other.n {
+            Option::None
+        } else {
+            let n = self.n;
+            let mut ord = Ordering::Equal;
+
+            let mut idx_self = (FiniteRing::new(n, n-1) + self.offset).unwrap();
+            let mut idx_other = (FiniteRing::new(n, n-1) + self.offset).unwrap();
+
+            while idx_self != self.offset {
+                match (self.bits[idx_self.val], other.bits[idx_other.val]) {
+                    (false, true) => { ord = Ordering::Less; break; },
+                    (true, false) => { ord = Ordering::Greater; break },
+                    (_, _) => {},
+                }
+                idx_self = (idx_self - FiniteRing::new(n, 1)).unwrap();
+                idx_other = (idx_other - FiniteRing::new(n, 1)).unwrap();
+            }
+
+            Option::Some(ord)
         }
     }
 }
@@ -326,34 +417,49 @@ impl<'a> DivAssign<&'a MersenneField> for MersenneField {
         }
 
         let n = self.n;
+        let p = MersenneField::ones(n);
 
-        let mut result = self.clone();
-        let mut base = other.clone();
+        let mut u = other.clone();
+        let mut v = MersenneField::ones(n);
 
-        let mut exponent: Vec<bool> = Vec::with_capacity(n);
-        let mut idx = 0;
+        let mut x1 = self.clone();
+        let mut x2 = MersenneField::zero(n);
 
-        // setting exponent to 2^n - 1
-        for _ in 0..n {
-            exponent.push(true);
-        }
-        // subtracting 2 from exponent
-        exponent[1] = false;
+        while !(u.is_one() || v.is_one()) {
+            while u.is_even() {
+                u.shift_right_one_noncyclic();
+                if x1.is_even() {
+                    x1.shift_right_one_noncyclic();
+                } else {
+                    x1.add_and_div_by_2_assign(&p);
+                }
+            }
+            while v.is_even() {
+                v.shift_right_one_noncyclic();
+                if x2.is_even() {
+                    x2.shift_right_one_noncyclic();
+                } else {
+                    x2.add_and_div_by_2_assign(&p);
+                }
+            }
 
-        // fast exponentiation
-        while idx < n {
-            if exponent[idx] {
-                result *= &base;
-                exponent[idx] = false;
+
+            if u >= v {
+                u -= &v;
+                x1 -= &x2;
             } else {
-                let tmp_base = base.clone();
-                base *= &tmp_base;
-                idx += 1; // perform shift right on the exponent
+                v -= &u;
+                x2 -= &x1;
             }
         }
 
-        self.bits = result.bits;
-        self.offset = result.offset;
+        if u.is_one() {
+            self.bits = x1.bits;
+            self.offset = x1.offset;
+        } else {
+            self.bits = x2.bits;
+            self.offset = x2.offset;
+        }
     }
 }
 
@@ -543,6 +649,31 @@ mod tests {
 
         assert_ne!(field, bitstring);
         assert_eq!(field, rotated_bitstring);
+    }
+
+    #[test]
+    fn comparisons() {
+        let mut x = "1011010".parse::<MersenneField>().unwrap();
+        let mut y = "0011110".parse::<MersenneField>().unwrap();
+        let mut z = "1011110".parse::<MersenneField>().unwrap();
+
+        assert!(x > y);
+        assert!(x < z);
+        assert!(y < z);
+        assert!(x == x);
+        assert!(x != y);
+    }
+
+    #[test]
+    fn non_cyclic_right_shift_one() {
+        let mut x = "1011010".parse::<MersenneField>().unwrap();
+        let y = "0101101".parse::<MersenneField>().unwrap();
+        let z = "0010110".parse::<MersenneField>().unwrap();
+
+        x.shift_right_one_noncyclic();
+        assert_eq!(x, y);
+        x.shift_right_one_noncyclic();
+        assert_eq!(x, z);
     }
 
     #[test]
