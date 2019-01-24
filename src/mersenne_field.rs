@@ -405,12 +405,45 @@ impl<'a> MulAssign<&'a MersenneField> for MersenneField {
 }
 
 impl<'a> DivAssign<&'a MersenneField> for MersenneField {
+    // Fermat's Little Theorem
+    fn div_assign(self: &mut Self, other: &Self) {
+        if self.n != other.n {
+            panic!("Mismatched bit vector lengths!")
+        }
+
+        let n = self.n;
+
+        let mut result = self.clone();
+        let mut base = other.clone();
+
+        let mut exponent: Vec<bool> = Vec::with_capacity(n);
+        let mut idx = 0;
+
+        // setting exponent to 2^n - 1
+        for _ in 0..n {
+            exponent.push(true);
+        }
+        // subtracting 2 from exponent
+        exponent[1] = false;
+
+        // fast exponentiation
+        while idx < n {
+            if exponent[idx] {
+                result *= &base;
+                exponent[idx] = false;
+            } else {
+                let tmp_base = base.clone();
+                base *= &tmp_base;
+                idx += 1; // perform shift right on the exponent
+            }
+        }
+
+        self.bits = result.bits;
+        self.offset = result.offset;
+    }
+
+    // Euclidean Algorithm
     /*
-     * by Fermat's Little Theorem, x/y = x * y^(p-2) = x * y^(2^n - 3)
-     * we setup an exponent that we subtract from and shift for fast exponentiation
-     *
-     * NOTE: 2^n - 1 MUST BE PRIME, OTHERWISE THIS WILL BE WRONG!
-     */
     fn div_assign(self: &mut Self, other: &Self) {
         if self.n != other.n {
             panic!("Mismatched bit vector lengths!")
@@ -461,6 +494,7 @@ impl<'a> DivAssign<&'a MersenneField> for MersenneField {
             self.offset = x2.offset;
         }
     }
+    */
 }
 
 impl ShlAssign<usize> for MersenneField {
