@@ -1,7 +1,7 @@
 mod finite_ring;
 pub mod mersenne_field;
 
-use std::collections::HashSet;
+use std::time::SystemTime;
 use crate::mersenne_field::MersenneField;
 
 pub type PublicKey = MersenneField;
@@ -26,6 +26,7 @@ pub fn encrypt(m: PlainText, pub_key: PublicKey, h: usize) -> CipherText {
 }
 
 pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
+    let start_time = SystemTime::now();
     let n = c.len();
     let mut z = c;
     let (f, g) = pri_key;
@@ -49,7 +50,7 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
         let (idx, field) = p;
         z = field.clone();
         f_indices.push(idx.clone());
-        println!("Obtained {} out of {} indices for A...", f_indices.len(), h);
+        println!("Obtained {} out of {} indices for A... Elapsed Time: {}s", f_indices.len(), h, start_time.elapsed().unwrap().as_secs());
     }
 
     while g_indices.len() < h {
@@ -66,7 +67,7 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
         let (idx, field) = p;
         z = field.clone();
         g_indices.push(idx.clone());
-        println!("Obtained {} out of {} indices for B...", g_indices.len(), h);
+        println!("Obtained {} out of {} indices for B... Elapsed Time: {}s", g_indices.len(), h, start_time.elapsed().unwrap().as_secs());
     }
 
     let mut a = MersenneField::new(n);
