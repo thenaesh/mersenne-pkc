@@ -49,6 +49,7 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
         let (idx, field) = p;
         z = field.clone();
         f_indices.push(idx.clone());
+        println!("Obtained {} out of {} indices for A...", f_indices.len(), h);
     }
 
     while g_indices.len() < h {
@@ -65,6 +66,7 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
         let (idx, field) = p;
         z = field.clone();
         g_indices.push(idx.clone());
+        println!("Obtained {} out of {} indices for B...", g_indices.len(), h);
     }
 
     let mut a = MersenneField::new(n);
@@ -84,13 +86,14 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
 fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField) -> Vec<(usize, MersenneField)> {
     let n = z.len();
 
-    println!("Computations for {} - {} * 2^i", z.to_string(), s.to_string());
+    //println!("Computations for {} - {} * 2^i", z.to_string(), s.to_string());
     let mut subtraction_powers_and_values = (0..n)
         .map(|i| {
             let mut d_i = z.clone();
             let mut ss = s.clone();
             ss <<= i;
             d_i -= &ss;
+            /*
             println!("{} - {} * 2^{} = {} - {} = {}, Hamming Weight: {}",
                 z.to_string(),
                 s.to_string(),
@@ -99,11 +102,12 @@ fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField) -> Vec
                 ss.to_string(),
                 d_i.to_string(),
                 d_i.hamming_weight());
+            */
             d_i
         })
         .enumerate()
         .collect::<Vec<(usize, MersenneField)>>();
-    println!("");
+    //println!("");
 
     subtraction_powers_and_values.sort_by_key(|(_, field)| field.hamming_weight());
     subtraction_powers_and_values

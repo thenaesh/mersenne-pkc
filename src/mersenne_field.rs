@@ -320,31 +320,23 @@ impl<'a> AddAssign<&'a MersenneField> for MersenneField {
             panic!("Mismatched bit vector lengths!")
         }
 
-        let mut result = MersenneField::new(self.n);
+        let n = self.n;
 
-        let mut carry_and_bit = (false, false);
-        for (i, (a,b)) in self.into_iter().zip(other.into_iter()).enumerate() {
-            carry_and_bit = match (carry_and_bit.0, a, b) {
-                (false, _, _) => (a && b, a != b),
-                (true, false, false) => (false, true),
-                (true, false, true) => (true, false),
-                (true, true, false) => (true, false),
-                (true, true, true) => (true, true),
-            };
+        let mut p = Mpz::new_reserve(n);
+        let mut a = Mpz::new_reserve(n);
+        let mut b = Mpz::new_reserve(n);
 
-            result.bits[i] = carry_and_bit.1;
+        for i in 0..n {
+            p.setbit(i);
+            if other.get(i) { a.setbit(i); } else { a.clrbit(i); }
+            if self.get(i) { b.setbit(i); } else { b.clrbit(i); }
         }
 
-        if carry_and_bit.0 {
-            let mut one_field = MersenneField::new(self.n);
-            one_field.bits[0] = true;
-            result += &one_field;
+        let c = (b + a) % p;
+
+        for i in 0..n {
+            self.set(i, c.tstbit(i));
         }
-
-        result.zero_if_all_one();
-
-        self.bits = result.bits;
-        self.offset = result.offset;
     }
 }
 
@@ -354,42 +346,24 @@ impl<'a> SubAssign<&'a MersenneField> for MersenneField {
             panic!("Mismatched bit vector lengths!")
         }
 
-        let mut result = MersenneField::new(self.n);
-        let mut neg_other = MersenneField::new(self.n);
-        let ones = MersenneField::ones(self.n);
-        let one = MersenneField::one(self.n);
+        let n = self.n;
 
-        // compute the negation of other, without modulo arithmetic, using method of complements
-        let mut carry_and_bit = (false, false);
-        for (i, (a,b)) in ones.into_iter().zip(other.complement().into_iter()).enumerate() {
-            carry_and_bit = match (carry_and_bit.0, a, b) {
-                (false, _, _) => (a && b, a != b),
-                (true, false, false) => (false, true),
-                (true, false, true) => (true, false),
-                (true, true, false) => (true, false),
-                (true, true, true) => (true, true),
-            };
+        let mut p = Mpz::new_reserve(n);
+        let mut a = Mpz::new_reserve(n);
+        let mut b = Mpz::new_reserve(n);
 
-            neg_other.bits[i] = carry_and_bit.1;
-        }
-        carry_and_bit = (false, false);
-        for (i, (a,b)) in neg_other.into_iter().zip(one.into_iter()).enumerate() {
-            carry_and_bit = match (carry_and_bit.0, a, b) {
-                (false, _, _) => (a && b, a != b),
-                (true, false, false) => (false, true),
-                (true, false, true) => (true, false),
-                (true, true, false) => (true, false),
-                (true, true, true) => (true, true),
-            };
-
-            result.bits[i] = carry_and_bit.1;
+        for i in 0..n {
+            p.setbit(i);
+            if other.get(i) { a.setbit(i); } else { a.clrbit(i); }
+            if self.get(i) { b.setbit(i); } else { b.clrbit(i); }
         }
 
-        result.zero_if_all_one();
-        result += self;
+        a = &p - a;
+        let c = (b + a) % &p;
 
-        self.bits = result.bits;
-        self.offset = result.offset;
+        for i in 0..n {
+            self.set(i, c.tstbit(i));
+        }
     }
 }
 
@@ -399,19 +373,23 @@ impl<'a> MulAssign<&'a MersenneField> for MersenneField {
             panic!("Mismatched bit vector lengths!")
         }
 
-        let mut result = MersenneField::new(self.n);
-        let mut other_buffer = other.clone();
+        let n = self.n;
 
-        for (i, bit) in self.into_iter().enumerate() {
-            if bit {
-                other_buffer <<= i;
-                result += &other_buffer;
-                other_buffer >>= i;
-            }
+        let mut p = Mpz::new_reserve(n);
+        let mut a = Mpz::new_reserve(n);
+        let mut b = Mpz::new_reserve(n);
+
+        for i in 0..n {
+            p.setbit(i);
+            if other.get(i) { a.setbit(i); } else { a.clrbit(i); }
+            if self.get(i) { b.setbit(i); } else { b.clrbit(i); }
         }
 
-        self.bits = result.bits;
-        self.offset = result.offset;
+        let c = (b * a) % p;
+
+        for i in 0..n {
+            self.set(i, c.tstbit(i));
+        }
     }
 }
 
