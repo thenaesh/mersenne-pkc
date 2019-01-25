@@ -1,4 +1,5 @@
 mod finite_ring;
+mod bit_vector;
 pub mod mersenne_field;
 
 use std::collections::HashSet;

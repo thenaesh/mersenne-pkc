@@ -495,6 +495,38 @@ impl<'a> DivAssign<&'a MersenneField> for MersenneField {
         }
     }
     */
+
+    // Montgomery Inversion
+    /*
+    fn div_assign(self: &mut Self, other: &Self) {
+        if self.n != other.n {
+            panic!("Mismatched bit vector lengths!")
+        }
+
+        let n = self.n;
+        let p = MersenneField::ones(n);
+
+        let mut u = other.clone();
+        let mut v = p.clone();
+
+        let mut x1 = MersenneField::one(n);
+        let mut x2 = MersenneField::zero(n);
+
+        let mut k = 0;
+
+        while !v.is_zero() {
+            k += 1;
+        }
+
+        if !u.is_one() {
+            panic!("Attempting to compute inverse of non-invertible element!");
+        }
+
+        if x1 > p {
+            x1 -= &p;
+        }
+    }
+    */
 }
 
 impl ShlAssign<usize> for MersenneField {
