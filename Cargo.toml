@@ -16,3 +16,4 @@ doc = false
 [dependencies]
 num = "0.2.0"
 rand = "0.6.4"
+rust-gmp = "0.5.0"
