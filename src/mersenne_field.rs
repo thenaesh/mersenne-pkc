@@ -8,6 +8,7 @@ use std::fmt::Display;
 use std::ops::{Add, Sub, Mul, Div};
 use std::ops::{AddAssign, SubAssign, MulAssign, DivAssign, ShlAssign, ShrAssign};
 use rand::Rng;
+use gmp::mpz::Mpz;
 
 use crate::finite_ring::FiniteRing;
 
@@ -89,6 +90,16 @@ impl MersenneField {
 
     pub fn len(self: &Self) -> usize {
         self.n
+    }
+
+    pub fn get(self: &Self, k: usize) -> bool {
+        let i = (self.offset + FiniteRing::new(self.n, k)).unwrap().val;
+        self.bits[i]
+    }
+
+    pub fn set(self: &mut Self, k: usize, bit: bool) {
+        let i = (self.offset + FiniteRing::new(self.n, k)).unwrap().val;
+        self.bits[i] = bit;
     }
 
     pub fn set_bits(self: &Self) -> Vec<usize> {
@@ -405,7 +416,6 @@ impl<'a> MulAssign<&'a MersenneField> for MersenneField {
 }
 
 impl<'a> DivAssign<&'a MersenneField> for MersenneField {
-    // Fermat's Little Theorem
     fn div_assign(self: &mut Self, other: &Self) {
         if self.n != other.n {
             panic!("Mismatched bit vector lengths!")
@@ -413,120 +423,25 @@ impl<'a> DivAssign<&'a MersenneField> for MersenneField {
 
         let n = self.n;
 
-        let mut result = self.clone();
-        let mut base = other.clone();
+        // want to compute b/a
+        // b is self, a is other
+        let mut p = Mpz::new_reserve(n);
+        let mut a = Mpz::new_reserve(n);
+        let mut b = Mpz::new_reserve(n);
 
-        let mut exponent: Vec<bool> = Vec::with_capacity(n);
-        let mut idx = 0;
-
-        // setting exponent to 2^n - 1
-        for _ in 0..n {
-            exponent.push(true);
-        }
-        // subtracting 2 from exponent
-        exponent[1] = false;
-
-        // fast exponentiation
-        while idx < n {
-            if exponent[idx] {
-                result *= &base;
-                exponent[idx] = false;
-            } else {
-                let tmp_base = base.clone();
-                base *= &tmp_base;
-                idx += 1; // perform shift right on the exponent
-            }
+        for i in 0..n {
+            p.setbit(i);
+            if other.get(i) { a.setbit(i); } else { a.clrbit(i); }
+            if self.get(i) { b.setbit(i); } else { b.clrbit(i); }
         }
 
-        self.bits = result.bits;
-        self.offset = result.offset;
-    }
+        let a_inverse = a.invert(&p).unwrap();
+        let c = (b * a_inverse) % p;
 
-    // Euclidean Algorithm
-    /*
-    fn div_assign(self: &mut Self, other: &Self) {
-        if self.n != other.n {
-            panic!("Mismatched bit vector lengths!")
-        }
-
-        let n = self.n;
-        let p = MersenneField::ones(n);
-
-        let mut u = other.clone();
-        let mut v = MersenneField::ones(n);
-
-        let mut x1 = self.clone();
-        let mut x2 = MersenneField::zero(n);
-
-        while !(u.is_one() || v.is_one()) {
-            while u.is_even() {
-                u.shift_right_one_noncyclic();
-                if x1.is_even() {
-                    x1.shift_right_one_noncyclic();
-                } else {
-                    x1.add_and_div_by_2_assign(&p);
-                }
-            }
-            while v.is_even() {
-                v.shift_right_one_noncyclic();
-                if x2.is_even() {
-                    x2.shift_right_one_noncyclic();
-                } else {
-                    x2.add_and_div_by_2_assign(&p);
-                }
-            }
-
-
-            if u >= v {
-                u -= &v;
-                x1 -= &x2;
-            } else {
-                v -= &u;
-                x2 -= &x1;
-            }
-        }
-
-        if u.is_one() {
-            self.bits = x1.bits;
-            self.offset = x1.offset;
-        } else {
-            self.bits = x2.bits;
-            self.offset = x2.offset;
+        for i in 0..n {
+            self.set(i, c.tstbit(i));
         }
     }
-    */
-
-    // Montgomery Inversion
-    /*
-    fn div_assign(self: &mut Self, other: &Self) {
-        if self.n != other.n {
-            panic!("Mismatched bit vector lengths!")
-        }
-
-        let n = self.n;
-        let p = MersenneField::ones(n);
-
-        let mut u = other.clone();
-        let mut v = p.clone();
-
-        let mut x1 = MersenneField::one(n);
-        let mut x2 = MersenneField::zero(n);
-
-        let mut k = 0;
-
-        while !v.is_zero() {
-            k += 1;
-        }
-
-        if !u.is_one() {
-            panic!("Attempting to compute inverse of non-invertible element!");
-        }
-
-        if x1 > p {
-            x1 -= &p;
-        }
-    }
-    */
 }
 
 impl ShlAssign<usize> for MersenneField {
@@ -546,6 +461,7 @@ impl ShrAssign<usize> for MersenneField {
 mod tests {
     use crate::mersenne_field::MersenneField;
     use crate::finite_ring::FiniteRing;
+    use gmp::mpz::Mpz;
 
     #[test]
     fn new_zeros_everything() {
@@ -917,5 +833,33 @@ mod tests {
             let x = MersenneField::new_uniform_random(128, 34);
             assert_eq!(x.hamming_weight(), 34);
         }
+    }
+
+    #[test]
+    fn mpz() {
+        let x = "10011".parse::<MersenneField>().unwrap();
+        let y = "00111".parse::<MersenneField>().unwrap();
+
+        let n = x.len();
+
+        let mut p = Mpz::new_reserve(n);
+        let mut a = Mpz::new_reserve(n);
+        let mut b = Mpz::new_reserve(n);
+
+        for i in 0..n {
+            p.setbit(i);
+            if x.get(i) { a.setbit(i); } else { a.clrbit(i); }
+            if y.get(i) { b.setbit(i); } else { b.clrbit(i); }
+        }
+
+        let c = (a * b) % p;
+
+        let mut z = MersenneField::new(n);
+        for i in 0..n {
+            z.set(i, c.tstbit(i));
+        }
+
+        let w = "01001".parse::<MersenneField>().unwrap();
+        assert_eq!(w, z);
     }
 }
