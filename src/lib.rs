@@ -84,30 +84,18 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     (a, b)
 }
 
-fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField) -> Vec<(usize, MersenneField)> {
+fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField) -> Vec<(usize, usize)> {
     let n = z.len();
 
-    //println!("Computations for {} - {} * 2^i", z.to_string(), s.to_string());
     let mut subtraction_powers_and_values = (0..n)
         .map(|i| {
             let d_i = shift_and_subtract(z, s, i);
-            /*
-            println!("{} - {} * 2^{} = {} - {} = {}, Hamming Weight: {}",
-                z.to_string(),
-                s.to_string(),
-                i,
-                z.to_string(),
-                ss.to_string(),
-                d_i.to_string(),
-                d_i.hamming_weight());
-            */
-            d_i
+            d_i.hamming_weight()
         })
         .enumerate()
-        .collect::<Vec<(usize, MersenneField)>>();
-    //println!("");
+        .collect::<Vec<(usize, usize)>>();
 
-    subtraction_powers_and_values.sort_by_key(|(_, field)| field.hamming_weight());
+    subtraction_powers_and_values.sort_by_key(|p| p.1);
     subtraction_powers_and_values
 }
 
