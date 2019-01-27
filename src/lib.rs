@@ -2,6 +2,10 @@ mod finite_ring;
 pub mod mersenne_field;
 
 use std::time::SystemTime;
+use std::cmp::min;
+use std::thread;
+use std::sync::mpsc::channel;
+use threadpool::ThreadPool;
 use crate::mersenne_field::MersenneField;
 
 pub type PublicKey = MersenneField;
@@ -26,6 +30,7 @@ pub fn encrypt(m: PlainText, pub_key: PublicKey, h: usize) -> CipherText {
 }
 
 pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
+    let mut pool = ThreadPool::new(8);
     let start_time = SystemTime::now();
     let n = c.len();
     let mut z = c;
@@ -37,7 +42,7 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     let mut g_indices: Vec<usize> = Vec::with_capacity(h);
 
     while f_indices.len() < h {
-        let vec = pick_smallest_subtraction_powers(&z, &f);
+        let vec = pick_smallest_subtraction_powers(&z, &f, &mut pool);
         let mut i = 0;
         let mut p = &vec[i];
         while f_indices.contains(&p.0) {
@@ -48,13 +53,14 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
             p = &vec[i];
         }
         let (idx, _) = p;
+        //z = shift_and_subtract(z.clone(), f.clone(), *idx);
         z = shift_and_subtract(&z, &f, *idx);
         f_indices.push(idx.clone());
         println!("Obtained {} out of {} indices for A... Elapsed Time: {}s", f_indices.len(), h, start_time.elapsed().unwrap().as_secs());
     }
 
     while g_indices.len() < h {
-        let vec = pick_smallest_subtraction_powers(&z, &g);
+        let vec = pick_smallest_subtraction_powers(&z, &g, &mut pool);
         let mut i = 0;
         let mut p = &vec[i];
         while g_indices.contains(&p.0) {
@@ -65,6 +71,7 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
             p = &vec[i];
         }
         let (idx, _) = p;
+        //z = shift_and_subtract(z.clone(), g.clone(), *idx);
         z = shift_and_subtract(&z, &g, *idx);
         g_indices.push(idx.clone());
         println!("Obtained {} out of {} indices for B... Elapsed Time: {}s", g_indices.len(), h, start_time.elapsed().unwrap().as_secs());
@@ -84,19 +91,41 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     (a, b)
 }
 
-fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField) -> Vec<(usize, usize)> {
+fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField, pool: &mut ThreadPool) -> Vec<(usize, usize)> {
+    let n_workers = 8;
+    let n_jobs = 8;
+
     let n = z.len();
+    let n_items_per_job = (n / n_jobs) + 1;
 
-    let mut subtraction_powers_and_values = (0..n)
-        .map(|i| {
-            let d_i = shift_and_subtract(z, s, i);
-            d_i.hamming_weight()
-        })
-        .enumerate()
-        .collect::<Vec<(usize, usize)>>();
+    let (tx, rx) = channel();
+    for i in 0..n_jobs {
+        let z = z.clone();
+        let s = s.clone();
+        let tx = tx.clone();
+        pool.execute(move || {
+            let start_idx = i * n_items_per_job;
+            let end_idx = min(n, start_idx + n_items_per_job);
 
-    subtraction_powers_and_values.sort_by_key(|p| p.1);
-    subtraction_powers_and_values
+            let mut subtraction_powers_and_values = (start_idx..end_idx)
+                .map(|idx| {
+                    let d_i = shift_and_subtract(&z, &s, idx);
+                    (idx, d_i.hamming_weight())
+                })
+                .collect::<Vec<(usize, usize)>>();
+
+            subtraction_powers_and_values.sort_by_key(|p| p.1);
+            //println!("job {}, running {}..{}, obtained {:?}", i, start_idx, end_idx, subtraction_powers_and_values);
+            tx.send(subtraction_powers_and_values[0]);
+        });
+    }
+
+    let mut result: Vec<(usize, usize)> = Vec::new();
+    for p in rx.iter().take(n_jobs) {
+        result.push(p);
+    }
+    result.sort_by_key(|p| p.1);
+    result
 }
 
 fn shift_and_subtract(z: &MersenneField, s: &MersenneField, idx: usize) -> MersenneField {
