@@ -90,10 +90,7 @@ fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField) -> Vec
     //println!("Computations for {} - {} * 2^i", z.to_string(), s.to_string());
     let mut subtraction_powers_and_values = (0..n)
         .map(|i| {
-            let mut d_i = z.clone();
-            let mut ss = s.clone();
-            ss <<= i;
-            d_i -= &ss;
+            let d_i = shift_and_subtract(z, s, i);
             /*
             println!("{} - {} * 2^{} = {} - {} = {}, Hamming Weight: {}",
                 z.to_string(),
@@ -112,4 +109,12 @@ fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField) -> Vec
 
     subtraction_powers_and_values.sort_by_key(|(_, field)| field.hamming_weight());
     subtraction_powers_and_values
+}
+
+fn shift_and_subtract(z: &MersenneField, s: &MersenneField, idx: usize) -> MersenneField {
+    let mut d_i = z.clone();
+    let mut ss = s.clone();
+    ss <<= idx;
+    d_i -= &ss;
+    d_i
 }
