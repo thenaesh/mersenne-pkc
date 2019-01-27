@@ -3,7 +3,6 @@ pub mod mersenne_field;
 
 use std::time::SystemTime;
 use std::cmp::min;
-use std::thread;
 use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
 use crate::mersenne_field::MersenneField;
@@ -13,6 +12,9 @@ pub type PrivateKey = (MersenneField, MersenneField);
 
 pub type PlainText = (MersenneField, MersenneField);
 pub type CipherText = MersenneField;
+
+const n_workers: usize = 8;
+const n_jobs: usize = 8;
 
 pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
     let a = MersenneField::new_uniform_random(n, h);
@@ -30,7 +32,7 @@ pub fn encrypt(m: PlainText, pub_key: PublicKey, h: usize) -> CipherText {
 }
 
 pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
-    let mut pool = ThreadPool::new(8);
+    let mut pool = ThreadPool::new(n_workers);
     let start_time = SystemTime::now();
     let n = c.len();
     let mut z = c;
@@ -92,9 +94,6 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
 }
 
 fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField, pool: &mut ThreadPool) -> Vec<(usize, usize)> {
-    let n_workers = 8;
-    let n_jobs = 8;
-
     let n = z.len();
     let n_items_per_job = (n / n_jobs) + 1;
 
@@ -102,6 +101,7 @@ fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField, pool: 
     for i in 0..n_jobs {
         let z = z.clone();
         let s = s.clone();
+
         let tx = tx.clone();
         pool.execute(move || {
             let start_idx = i * n_items_per_job;
@@ -114,8 +114,7 @@ fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField, pool: 
                 })
                 .collect::<Vec<(usize, usize)>>();
 
-            subtraction_powers_and_values.sort_by_key(|p| p.1);
-            //println!("job {}, running {}..{}, obtained {:?}", i, start_idx, end_idx, subtraction_powers_and_values);
+            subtraction_powers_and_values.sort_unstable_by_key(|p| p.1);
             tx.send(subtraction_powers_and_values[0]);
         });
     }
@@ -124,7 +123,7 @@ fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField, pool: 
     for p in rx.iter().take(n_jobs) {
         result.push(p);
     }
-    result.sort_by_key(|p| p.1);
+    result.sort_unstable_by_key(|p| p.1);
     result
 }
 
