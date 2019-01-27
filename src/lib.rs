@@ -47,8 +47,8 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
             }
             p = &vec[i];
         }
-        let (idx, field) = p;
-        z = field.clone();
+        let (idx, _) = p;
+        z = shift_and_subtract(&z, &f, *idx);
         f_indices.push(idx.clone());
         println!("Obtained {} out of {} indices for A... Elapsed Time: {}s", f_indices.len(), h, start_time.elapsed().unwrap().as_secs());
     }
@@ -64,8 +64,8 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
             }
             p = &vec[i];
         }
-        let (idx, field) = p;
-        z = field.clone();
+        let (idx, _) = p;
+        z = shift_and_subtract(&z, &g, *idx);
         g_indices.push(idx.clone());
         println!("Obtained {} out of {} indices for B... Elapsed Time: {}s", g_indices.len(), h, start_time.elapsed().unwrap().as_secs());
     }
