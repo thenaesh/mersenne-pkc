@@ -13,8 +13,8 @@ pub type PrivateKey = (MersenneField, MersenneField);
 pub type PlainText = (MersenneField, MersenneField);
 pub type CipherText = MersenneField;
 
-const n_workers: usize = 2;
-const n_jobs: usize = 2;
+const N_WORKERS: usize = 2;
+const N_JOBS: usize = 2;
 
 pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
     let a = MersenneField::new_uniform_random(n, h);
@@ -32,7 +32,7 @@ pub fn encrypt(m: PlainText, pub_key: PublicKey, h: usize) -> CipherText {
 }
 
 pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
-    let mut pool = ThreadPool::new(n_workers);
+    let mut pool = ThreadPool::new(N_WORKERS);
     let start_time = SystemTime::now();
     let n = c.len();
     let mut z = c;
@@ -95,10 +95,10 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
 
 fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField, pool: &mut ThreadPool) -> Vec<(usize, usize)> {
     let n = z.len();
-    let n_items_per_job = (n / n_jobs) + 1;
+    let n_items_per_job = (n / N_JOBS) + 1;
 
     let (tx, rx) = channel();
-    for i in 0..n_jobs {
+    for i in 0..N_JOBS {
         let z = z.clone();
         let s = s.clone();
 
@@ -120,7 +120,7 @@ fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField, pool: 
     }
 
     let mut result: Vec<(usize, usize)> = Vec::new();
-    for p in rx.iter().take(n_jobs) {
+    for p in rx.iter().take(N_JOBS) {
         result.push(p);
     }
     result.sort_unstable_by_key(|p| p.1);
