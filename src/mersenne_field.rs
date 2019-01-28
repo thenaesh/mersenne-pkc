@@ -5,7 +5,6 @@ use std::iter::IntoIterator;
 use std::cmp::{PartialEq, Eq, PartialOrd};
 use std::str::FromStr;
 use std::fmt::Display;
-use std::ops::{Add, Sub, Mul, Div};
 use std::ops::{AddAssign, SubAssign, MulAssign, DivAssign, ShlAssign, ShrAssign};
 use rand::Rng;
 use gmp::mpz::Mpz;
@@ -15,7 +14,7 @@ use crate::finite_ring::FiniteRing;
 #[derive(Debug, Clone)]
 pub struct MersenneField {
     n: usize,
-    pub bits: Vec<bool>,
+    pub bits: Mpz,
     offset: FiniteRing,
 }
 
@@ -34,7 +33,7 @@ impl<'a> Iterator for MersenneFieldIterator<'a> {
         } else {
             self.dirty = true;
             let i = self.idx.val;
-            let bit = (*self.field).bits[i as usize];
+            let bit = (*self.field).bits.tstbit(i as usize);
 
             self.idx = (self.idx + FiniteRing::new(self.field.n, 1)).unwrap();
             Option::Some(bit)
@@ -57,17 +56,11 @@ impl<'a> IntoIterator for &'a MersenneField {
 
 impl MersenneField {
     pub fn new(n: usize) -> Self {
-        let mut field = MersenneField {
+        MersenneField {
             n: n,
-            bits: Vec::new(),
+            bits: Mpz::new_reserve(n),
             offset: FiniteRing::new(n, 0),
-        };
-
-        for _ in 0..n {
-            field.bits.push(false);
         }
-
-        field
     }
 
     pub fn new_uniform_random(n: usize, hamming_weight: usize) -> Self {
@@ -77,11 +70,11 @@ impl MersenneField {
         let mut i = 0;
         while i < hamming_weight {
             let rand_idx = rng.gen::<usize>() % n;
-            if field.bits[rand_idx] {
+            if field.bits.tstbit(rand_idx) {
                 continue;
             } else {
                 i += 1;
-                field.bits[rand_idx] = true;
+                field.bits.setbit(rand_idx);
             }
         }
 
@@ -94,18 +87,18 @@ impl MersenneField {
 
     pub fn get(self: &Self, k: usize) -> bool {
         let i = (self.offset + FiniteRing::new(self.n, k)).unwrap().val;
-        self.bits[i]
+        self.bits.tstbit(i)
     }
 
     pub fn set(self: &mut Self, k: usize, bit: bool) {
         let i = (self.offset + FiniteRing::new(self.n, k)).unwrap().val;
-        self.bits[i] = bit;
+        if bit { self.bits.setbit(i); } else { self.bits.clrbit(i); }
     }
 
     pub fn set_bits(self: &Self) -> Vec<usize> {
         let mut vec: Vec<usize> = Vec::new();
         for i in 0..self.n {
-            if !self.bits[i] {
+            if !self.bits.tstbit(i) {
                 continue;
             }
             let j = (FiniteRing::new(self.n, i) - self.offset).unwrap().val;
@@ -122,13 +115,27 @@ impl MersenneField {
         }
     }
 
+    fn apply_rotation(self: &mut Self) {
+        if self.offset.val == 0 {
+            return;
+        }
+
+        let n = self.n;
+        for _ in 0..self.offset.val {
+            let lowest_order_bit = self.bits.tstbit(0);
+            self.bits >>= 1;
+            if lowest_order_bit { self.bits.setbit(n-1); } else { self.bits.clrbit(n-1); }
+        }
+        self.offset = FiniteRing::new(n, 0);
+    }
+
     fn shift_right_one_noncyclic(self: &mut Self) {
-        self.bits[self.offset.val] = false;
+        self.bits.clrbit(self.offset.val);
         self.offset = (self.offset + FiniteRing::new(self.n, 1)).unwrap();
     }
 
     fn is_odd(self: &Self) -> bool {
-        self.bits[self.offset.val]
+        self.bits.tstbit(self.offset.val)
     }
 
     fn is_even(self: &Self) -> bool {
@@ -156,17 +163,16 @@ impl MersenneField {
 
         let n = self.n;
         for i in 0..n {
-            self.bits[i] = false;
+            self.bits.clrbit(i);
         }
     }
 
     fn complement(self: &Self) -> MersenneField {
-        let mut field = MersenneField::new(self.n);
-        for i in 0..self.n {
-            field.bits[i] = !self.bits[i];
+        MersenneField {
+            n: self.n,
+            bits: self.bits.compl(),
+            offset: self.offset,
         }
-        field.offset = self.offset;
-        field
     }
 
     pub fn hamming_weight(self: &Self) -> usize {
@@ -176,47 +182,19 @@ impl MersenneField {
     fn ones(n: usize) -> MersenneField {
         let mut field = MersenneField::new(n);
         for i in 0..n {
-            field.bits[i] = true;
+            field.bits.setbit(i);
         }
         field
     }
 
     fn one(n: usize) -> MersenneField {
         let mut field = MersenneField::new(n);
-        field.bits[0] = true;
+        field.bits.setbit(0);
         field
     }
 
     fn zero(n: usize) -> MersenneField {
         MersenneField::new(n)
-    }
-
-    fn add_and_div_by_2_assign(self: &mut Self, other: &Self) {
-        if self.n != other.n {
-            panic!("Mismatched bit vector lengths!")
-        }
-
-        let mut result: Vec<bool> = Vec::with_capacity(self.n + 1);
-
-        let mut carry_and_bit = (false, false);
-        for (i, (a,b)) in self.into_iter().zip(other.into_iter()).enumerate() {
-            carry_and_bit = match (carry_and_bit.0, a, b) {
-                (false, _, _) => (a && b, a != b),
-                (true, false, false) => (false, true),
-                (true, false, true) => (true, false),
-                (true, true, false) => (true, false),
-                (true, true, true) => (true, true),
-            };
-
-            result.push(carry_and_bit.1);
-        }
-        result.push(carry_and_bit.0);
-
-        // division by 2 (i.e. right shifting by 1) happens implicitly here
-        for i in 0..self.n {
-            self.bits[i] = result[i+1];
-        }
-        self.offset = FiniteRing::new(self.n, 0);
     }
 }
 
@@ -233,7 +211,7 @@ impl FromStr for MersenneField {
         let mut field = MersenneField::new(n);
 
         for (i, bit) in bitstring.chars().map(|c| c != '0').rev().enumerate() {
-            field.bits[i] = bit;
+            if bit { field.bits.setbit(i); } else { field.bits.clrbit(i); }
         }
 
         field.zero_if_all_one();
@@ -263,7 +241,7 @@ impl Display for MersenneField {
 impl PartialEq<&str> for MersenneField {
     fn eq(self: &Self, other: &&str) -> bool {
         let bitstring = *other;
-        return if bitstring.len() != self.bits.len() {
+        return if bitstring.len() != self.n {
             false
         } else {
             (&self)
@@ -290,27 +268,11 @@ impl Eq for MersenneField {}
 
 impl PartialOrd for MersenneField {
     fn partial_cmp(self: &Self, other: &Self) -> Option<Ordering> {
-        return if self.n != other.n {
-            Option::None
-        } else {
-            let n = self.n;
-            let mut ord = Ordering::Equal;
-
-            let mut idx_self = (FiniteRing::new(n, n-1) + self.offset).unwrap();
-            let mut idx_other = (FiniteRing::new(n, n-1) + self.offset).unwrap();
-
-            while idx_self != self.offset {
-                match (self.bits[idx_self.val], other.bits[idx_other.val]) {
-                    (false, true) => { ord = Ordering::Less; break; },
-                    (true, false) => { ord = Ordering::Greater; break },
-                    (_, _) => {},
-                }
-                idx_self = (idx_self - FiniteRing::new(n, 1)).unwrap();
-                idx_other = (idx_other - FiniteRing::new(n, 1)).unwrap();
-            }
-
-            Option::Some(ord)
+        if self.n != other.n {
+            panic!("Mismatched bit vector lengths!")
         }
+
+        self.bits.partial_cmp(&other.bits)
     }
 }
 
@@ -323,20 +285,12 @@ impl<'a> AddAssign<&'a MersenneField> for MersenneField {
         let n = self.n;
 
         let mut p = Mpz::new_reserve(n);
-        let mut a = Mpz::new_reserve(n);
-        let mut b = Mpz::new_reserve(n);
-
         for i in 0..n {
             p.setbit(i);
-            if other.get(i) { a.setbit(i); } else { a.clrbit(i); }
-            if self.get(i) { b.setbit(i); } else { b.clrbit(i); }
         }
 
-        let c = (b + a) % p;
-
-        for i in 0..n {
-            self.set(i, c.tstbit(i));
-        }
+        self.bits += &other.bits;
+        self.bits %= &p;
     }
 }
 
@@ -349,21 +303,13 @@ impl<'a> SubAssign<&'a MersenneField> for MersenneField {
         let n = self.n;
 
         let mut p = Mpz::new_reserve(n);
-        let mut a = Mpz::new_reserve(n);
-        let mut b = Mpz::new_reserve(n);
-
         for i in 0..n {
             p.setbit(i);
-            if other.get(i) { a.setbit(i); } else { a.clrbit(i); }
-            if self.get(i) { b.setbit(i); } else { b.clrbit(i); }
         }
 
-        a = &p - a;
-        let c = (b + a) % &p;
-
-        for i in 0..n {
-            self.set(i, c.tstbit(i));
-        }
+        self.bits -= &other.bits;
+        self.bits += &p;
+        self.bits %= &p;
     }
 }
 
@@ -376,20 +322,12 @@ impl<'a> MulAssign<&'a MersenneField> for MersenneField {
         let n = self.n;
 
         let mut p = Mpz::new_reserve(n);
-        let mut a = Mpz::new_reserve(n);
-        let mut b = Mpz::new_reserve(n);
-
         for i in 0..n {
             p.setbit(i);
-            if other.get(i) { a.setbit(i); } else { a.clrbit(i); }
-            if self.get(i) { b.setbit(i); } else { b.clrbit(i); }
         }
 
-        let c = (b * a) % p;
-
-        for i in 0..n {
-            self.set(i, c.tstbit(i));
-        }
+        self.bits *= &other.bits;
+        self.bits %= &p;
     }
 }
 
@@ -404,33 +342,43 @@ impl<'a> DivAssign<&'a MersenneField> for MersenneField {
         // want to compute b/a
         // b is self, a is other
         let mut p = Mpz::new_reserve(n);
-        let mut a = Mpz::new_reserve(n);
-        let mut b = Mpz::new_reserve(n);
-
         for i in 0..n {
             p.setbit(i);
-            if other.get(i) { a.setbit(i); } else { a.clrbit(i); }
-            if self.get(i) { b.setbit(i); } else { b.clrbit(i); }
         }
 
-        let a_inverse = a.invert(&p).unwrap();
-        let c = (b * a_inverse) % p;
-
-        for i in 0..n {
-            self.set(i, c.tstbit(i));
-        }
+        self.bits *= other.bits.invert(&p).unwrap();
+        self.bits %= &p;
     }
 }
 
 impl ShlAssign<usize> for MersenneField {
     fn shl_assign(self: &mut Self, k: usize) {
-        self.rotate(-FiniteRing::new(self.n, k));
+        let n = self.n;
+        self.bits <<= k;
+        for i in 0..k {
+             if self.bits.tstbit(n+i) {
+                 self.bits.setbit(i);
+             } else{
+                 self.bits.clrbit(i);
+             }
+        }
+        for i in 0..k {
+            self.bits.clrbit(n+i);
+        }
     }
 }
 
 impl ShrAssign<usize> for MersenneField {
     fn shr_assign(self: &mut Self, k: usize) {
-        self.rotate(FiniteRing::new(self.n, k));
+        let n = self.n;
+        for i in 0..k {
+             if self.bits.tstbit(i) {
+                 self.bits.setbit(n+i);
+             } else{
+                 self.bits.clrbit(n+i);
+             }
+        }
+        self.bits >>= k;
     }
 }
 
@@ -450,7 +398,7 @@ mod tests {
         assert!(field.offset == FiniteRing::new(n, 0));
 
         for i in 0..n {
-            assert_eq!(field.bits[i], false);
+            assert_eq!(field.bits.tstbit(i), false);
         }
     }
 
@@ -460,10 +408,9 @@ mod tests {
         let field: MersenneField = bitstring.parse().unwrap();
 
         assert_eq!(field.n, bitstring.len());
-        assert_eq!(field.n, field.bits.len());
 
         for (i, bit) in bitstring.chars().rev().map(|c| c != '0').enumerate() {
-            assert_eq!(field.bits[i], bit);
+            assert_eq!(field.bits.tstbit(i), bit);
         }
     }
 
@@ -765,6 +712,15 @@ mod tests {
         let w = "0111".parse::<MersenneField>().unwrap();
         z *= &w;
         assert_eq!(z, "0011");
+    }
+
+    #[test]
+    fn mul_rotated_value() {
+        let mut x = "10101".parse::<MersenneField>().unwrap();
+        let mut y = "10010".parse::<MersenneField>().unwrap();
+        y <<= 1;
+        x *= &y;
+        assert_eq!(x, "01100");
     }
 
     #[test]

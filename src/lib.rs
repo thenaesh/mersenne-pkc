@@ -13,8 +13,8 @@ pub type PrivateKey = (MersenneField, MersenneField);
 pub type PlainText = (MersenneField, MersenneField);
 pub type CipherText = MersenneField;
 
-const n_workers: usize = 8;
-const n_jobs: usize = 8;
+const n_workers: usize = 2;
+const n_jobs: usize = 2;
 
 pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
     let a = MersenneField::new_uniform_random(n, h);
@@ -83,11 +83,11 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     let mut b = MersenneField::new(n);
 
     for idx in f_indices {
-        a.bits[idx] = true;
+        a.bits.setbit(idx);
     }
 
     for idx in g_indices {
-        b.bits[idx] = true;
+        b.bits.setbit(idx);
     }
 
     (a, b)
