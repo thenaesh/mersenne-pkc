@@ -13,8 +13,8 @@ pub type PrivateKey = (MersenneField, MersenneField);
 pub type PlainText = (MersenneField, MersenneField);
 pub type CipherText = MersenneField;
 
-const N_WORKERS: usize = 2;
-const N_JOBS: usize = 2;
+const N_WORKERS: usize = 8;
+const N_JOBS: usize = 8;
 
 pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
     let a = MersenneField::new_uniform_random(n, h);

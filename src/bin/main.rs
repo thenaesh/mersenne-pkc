@@ -1,7 +1,7 @@
 use mersennepkc::*;
 
 fn main() {
-    let n = 4423;
+    let n = 9689;
     let h = 32;
 
     let (f, g) = randomly_generate_message(n, h);
