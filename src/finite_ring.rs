@@ -28,22 +28,22 @@ impl Neg for FiniteRing {
 }
 
 impl Add<FiniteRing> for FiniteRing {
-    type Output = Option<FiniteRing>;
+    type Output = FiniteRing;
 
     fn add(self, other: FiniteRing) -> Self::Output {
         if self.modulus != other.modulus {
-            return Option::None;
+            panic!("Adding FiniteRings with different moduli!");
         }
 
         let mut sum = self.val + other.val;
         if sum >= self.modulus { sum = sum - self.modulus; }
 
-        Option::Some(FiniteRing { modulus: self.modulus, val: sum })
+        FiniteRing { modulus: self.modulus, val: sum }
     }
 }
 
 impl Sub<FiniteRing> for FiniteRing {
-    type Output = Option<FiniteRing>;
+    type Output = FiniteRing;
 
     fn sub(self, other: FiniteRing) -> Self::Output {
         self + (-other)
@@ -85,107 +85,75 @@ mod tests {
     }
 
     #[test]
-    fn add_different_modulus_returns_none() {
-        let x = FiniteRing::new(15, 3);
-        let y = FiniteRing::new(17, 0);
-        let z = x + y;
-        assert!(z.is_none());
-    }
-
-    #[test]
     fn add_zero_val_correct() {
         let x = FiniteRing::new(15, 3);
         let y = FiniteRing::new(15, 0);
-        if let Some(z) = x + y {
-            assert_eq!(z.val, 3);
-        } else {
-            assert!(false);
-        }
+        let z = x + y;
+        assert_eq!(z.val, 3);
     }
 
     #[test]
     fn add_zero_modulus_correct() {
         let x = FiniteRing::new(15, 3);
         let y = FiniteRing::new(15, 0);
-        if let Some(z) = x + y {
-            assert_eq!(z.modulus, 15);
-        } else {
-            assert!(false);
-        }
+        let z = x + y;
+        assert_eq!(z.modulus, 15);
     }
 
     #[test]
     fn add_modulus_val_correct() {
         let x = FiniteRing::new(15, 3);
         let y = FiniteRing::new(15, 12);
-        if let Some(z) = x + y {
-            assert_eq!(z.val, 0);
-        } else {
-            assert!(false);
-        }
+        let z = x + y;
+        assert_eq!(z.val, 0);
     }
 
     #[test]
     fn add_modulus_modulus_correct() {
         let x = FiniteRing::new(15, 3);
         let y = FiniteRing::new(15, 12);
-        if let Some(z) = x + y {
-            assert_eq!(z.modulus, 15);
-        } else {
-            assert!(false);
-        }
+        let z = x + y;
+        assert_eq!(z.modulus, 15);
     }
 
     #[test]
     fn add_nowrap_val_correct() {
         let x = FiniteRing::new(15, 3);
         let y = FiniteRing::new(15, 11);
-        if let Some(z) = x + y {
-            assert_eq!(z.val, 14);
-        } else {
-            assert!(false);
-        }
+        let z = x + y;
+        assert_eq!(z.val, 14);
     }
 
     #[test]
     fn add_nowrap_modulus_correct() {
         let x = FiniteRing::new(15, 3);
         let y = FiniteRing::new(15, 11);
-        if let Some(z) = x + y {
-            assert_eq!(z.modulus, 15);
-        } else {
-            assert!(false);
-        }
+        let z = x + y;
+        assert_eq!(z.modulus, 15);
     }
 
     #[test]
     fn add_wrap_val_correct() {
         let x = FiniteRing::new(15, 3);
         let y = FiniteRing::new(15, 14);
-        if let Some(z) = x + y {
-            assert_eq!(z.val, 2);
-        } else {
-            assert!(false);
-        }
+        let z = x + y;
+        assert_eq!(z.val, 2);
     }
 
     #[test]
     fn add_wrap_modulus_correct() {
         let x = FiniteRing::new(15, 3);
         let y = FiniteRing::new(15, 14);
-        if let Some(z) = x + y {
-            assert_eq!(z.modulus, 15);
-        } else {
-            assert!(false);
-        }
+        let z = x + y;
+        assert_eq!(z.modulus, 15);
     }
 
     #[test]
     fn pass_by_value() {
         let x = FiniteRing::new(15, 3);
         let y = FiniteRing::new(15, 4);
-        let z1 = (x+y).unwrap();
-        let z2 = (x+y).unwrap();
+        let z1 = x + y;
+        let z2 = x + y;
         assert_eq!(z1.val, z2.val);
         assert_eq!(z1.modulus, z2.modulus);
     }

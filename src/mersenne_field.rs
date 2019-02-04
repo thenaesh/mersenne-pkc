@@ -35,7 +35,7 @@ impl<'a> Iterator for MersenneFieldIterator<'a> {
             let i = self.idx.val;
             let bit = (*self.field).bits.tstbit(i as usize);
 
-            self.idx = (self.idx + FiniteRing::new(self.field.n, 1)).unwrap();
+            self.idx = self.idx + FiniteRing::new(self.field.n, 1);
             Option::Some(bit)
         }
     }
@@ -86,12 +86,12 @@ impl MersenneField {
     }
 
     pub fn get(self: &Self, k: usize) -> bool {
-        let i = (self.offset + FiniteRing::new(self.n, k)).unwrap().val;
+        let i = (self.offset + FiniteRing::new(self.n, k)).val;
         self.bits.tstbit(i)
     }
 
     pub fn set(self: &mut Self, k: usize, bit: bool) {
-        let i = (self.offset + FiniteRing::new(self.n, k)).unwrap().val;
+        let i = (self.offset + FiniteRing::new(self.n, k)).val;
         if bit { self.bits.setbit(i); } else { self.bits.clrbit(i); }
     }
 
@@ -101,18 +101,14 @@ impl MersenneField {
             if !self.bits.tstbit(i) {
                 continue;
             }
-            let j = (FiniteRing::new(self.n, i) - self.offset).unwrap().val;
+            let j = (FiniteRing::new(self.n, i) - self.offset).val;
             vec.push(j);
         }
         vec
     }
 
     fn rotate(self: &mut Self, k: FiniteRing) {
-        if let Some(result) = self.offset + k {
-            self.offset = result;
-        } else {
-            panic!("Adding two FiniteRings with different moduli!");
-        }
+        self.offset = self.offset + k;
     }
 
     fn apply_rotation(self: &mut Self) {
@@ -131,7 +127,7 @@ impl MersenneField {
 
     fn shift_right_one_noncyclic(self: &mut Self) {
         self.bits.clrbit(self.offset.val);
-        self.offset = (self.offset + FiniteRing::new(self.n, 1)).unwrap();
+        self.offset = self.offset + FiniteRing::new(self.n, 1);
     }
 
     fn is_odd(self: &Self) -> bool {
@@ -447,23 +443,23 @@ mod tests {
 
         field.rotate(-FiniteRing::new(field.n, 1));
         assert_eq!(field.bits, original_bits);
-        assert_eq!(field.offset, (original_offset - FiniteRing::new(field.n, 1)).unwrap());
+        assert_eq!(field.offset, original_offset - FiniteRing::new(field.n, 1));
 
         field.rotate(-FiniteRing::new(field.n, 2));
         assert_eq!(field.bits, original_bits);
-        assert_eq!(field.offset, (original_offset - FiniteRing::new(field.n, 3)).unwrap());
+        assert_eq!(field.offset, original_offset - FiniteRing::new(field.n, 3));
 
         field.rotate(-FiniteRing::new(field.n, 4));
         assert_eq!(field.bits, original_bits);
-        assert_eq!(field.offset, (original_offset - FiniteRing::new(field.n, 7)).unwrap());
+        assert_eq!(field.offset, original_offset - FiniteRing::new(field.n, 7));
 
         field.rotate(FiniteRing::new(field.n, 4));
         assert_eq!(field.bits, original_bits);
-        assert_eq!(field.offset, (original_offset - FiniteRing::new(field.n, 3)).unwrap());
+        assert_eq!(field.offset, original_offset - FiniteRing::new(field.n, 3));
 
         field.rotate(FiniteRing::new(field.n, 2));
         assert_eq!(field.bits, original_bits);
-        assert_eq!(field.offset, (original_offset - FiniteRing::new(field.n, 1)).unwrap());
+        assert_eq!(field.offset, original_offset - FiniteRing::new(field.n, 1));
 
 
         field.rotate(FiniteRing::new(field.n, 1));
