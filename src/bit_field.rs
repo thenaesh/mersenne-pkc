@@ -50,7 +50,7 @@ impl BitField {
         BitField::Dense(n, Mpz::new_reserve(n))
     }
 
-    pub fn sparse_to_dense(self: &BitField) -> BitField {
+    pub fn as_dense(self: &BitField) -> BitField {
         match self {
             BitField::Dense(_, _) => self.clone(),
             BitField::Sparse(n, vec, offset) => {
@@ -65,7 +65,7 @@ impl BitField {
         }
     }
 
-    pub fn dense_to_sparse(self: &BitField) -> BitField {
+    pub fn as_sparse(self: &BitField) -> BitField {
         match self {
             BitField::Sparse(_, _, _) => self.clone(),
             BitField::Dense(n, bitstring) => {
@@ -80,22 +80,6 @@ impl BitField {
 
                 BitField::Sparse(*n, vec, offset)
             }
-        }
-    }
-
-    pub fn as_sparse<'a>(self: &'a BitField) -> SparseContents<'a> {
-        if let BitField::Sparse(n, vec, offset) = self {
-            (*n, vec, *offset)
-        } else {
-            panic!("Failed unwrapping of BitField, expected BitField::Sparse!");
-        }
-    }
-
-    pub fn as_dense<'a>(self: &'a BitField) -> DenseContents<'a> {
-        if let BitField::Dense(n, bitstring) = self {
-            (*n, bitstring)
-        } else {
-            panic!("Failed unwrapping of BitField, expected BitField::Dense!");
         }
     }
 }
