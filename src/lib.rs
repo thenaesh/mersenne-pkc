@@ -1,5 +1,6 @@
 mod finite_ring;
 pub mod mersenne_field;
+pub mod bit_field;
 
 use std::time::SystemTime;
 use std::cmp::min;
