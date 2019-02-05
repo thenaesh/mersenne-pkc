@@ -82,6 +82,22 @@ impl BitField {
             }
         }
     }
+
+    pub fn unwrap_dense<'a>(self: &'a BitField) -> DenseContents<'a> {
+        if let BitField::Dense(n, bitstring) = self {
+            (*n, bitstring)
+        } else {
+            panic!("Unwrapping BitField as dense failed!");
+        }
+    }
+
+    pub fn unwrap_sparse<'a>(self: &'a BitField) -> SparseContents<'a> {
+        if let BitField::Sparse(n, vec, offset) = self {
+            (*n, vec, *offset)
+        } else {
+            panic!("Unwrapping BitField as sparse failed!");
+        }
+    }
 }
 
 impl Index<usize> for BitField {
