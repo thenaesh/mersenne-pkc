@@ -1,5 +1,6 @@
 use std::vec::Vec;
 use std::iter::Iterator;
+use std::ops::{Index, IndexMut};
 use gmp::mpz::Mpz;
 
 use crate::finite_ring::FiniteRing;
@@ -9,6 +10,9 @@ pub enum BitField {
     Sparse(usize, Vec<usize>, FiniteRing), // bitstring length, set bits, offset (for O(1) shifting)
     Dense(usize, Mpz), // bitstring length, optimized bitstring
 }
+
+type SparseContents<'a> = (usize, &'a Vec<usize>, FiniteRing);
+type DenseContents<'a> = (usize, &'a Mpz);
 
 impl BitField {
     pub fn new_sparse(n: usize) -> BitField {
@@ -78,6 +82,38 @@ impl BitField {
             }
         }
     }
+
+    pub fn as_sparse<'a>(self: &'a BitField) -> SparseContents<'a> {
+        if let BitField::Sparse(n, vec, offset) = self {
+            (*n, vec, *offset)
+        } else {
+            panic!("Failed unwrapping of BitField, expected BitField::Sparse!");
+        }
+    }
+
+    pub fn as_dense<'a>(self: &'a BitField) -> DenseContents<'a> {
+        if let BitField::Dense(n, bitstring) = self {
+            (*n, bitstring)
+        } else {
+            panic!("Failed unwrapping of BitField, expected BitField::Dense!");
+        }
+    }
+}
+
+impl Index<usize> for BitField {
+    type Output = bool;
+
+    fn index<'a>(self: &'a Self, idx: usize) -> &'a Self::Output {
+        match self {
+            BitField::Sparse(n, vec, offset) => {
+                let real_idx = (FiniteRing::new(*n, idx) + *offset).val;
+                if vec.contains(&real_idx) { &true } else { &false }
+            },
+            BitField::Dense(_, bitstring) => {
+                if bitstring.tstbit(idx) { &true } else { &false }
+            },
+        }
+    }
 }
 
 #[cfg(test)]
@@ -111,5 +147,27 @@ mod tests {
         } else {
             panic!("Dense field expected but sparse field encountered!");
         }
+    }
+
+    #[test]
+    fn index_sparse() {
+        let string = "10010";
+        let field = BitField::new_sparse_from_str(string);
+        assert_eq!(field[0], false);
+        assert_eq!(field[1], true);
+        assert_eq!(field[2], false);
+        assert_eq!(field[3], false);
+        assert_eq!(field[4], true);
+    }
+
+    #[test]
+    fn index_dense() {
+        let string = "10010";
+        let field = BitField::new_dense_from_str(string);
+        assert_eq!(field[0], false);
+        assert_eq!(field[1], true);
+        assert_eq!(field[2], false);
+        assert_eq!(field[3], false);
+        assert_eq!(field[4], true);
     }
 }
