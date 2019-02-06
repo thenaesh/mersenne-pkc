@@ -4,6 +4,7 @@ use std::ops::Index;
 use std::ops::{ShlAssign, ShrAssign, AddAssign, SubAssign, MulAssign, DivAssign};
 use std::fmt::Display;
 use gmp::mpz::Mpz;
+use rand::Rng;
 
 use crate::finite_ring::FiniteRing;
 
@@ -53,6 +54,24 @@ impl BitField {
 
     pub fn new_dense(n: usize) -> BitField {
         BitField::Dense(n, Mpz::new_reserve(n))
+    }
+
+    pub fn new_uniform_random(n: usize, hamming_weight: usize) -> BitField {
+        let mut rng = rand::thread_rng();
+        let mut vec = Vec::<usize>::with_capacity(hamming_weight);
+
+        let mut i = 0;
+        while i < hamming_weight {
+            let rand_idx = rng.gen::<usize>() % n;
+            if vec.contains(&rand_idx) {
+                continue;
+            } else {
+                i += 1;
+                vec.push(rand_idx);
+            }
+        }
+
+        BitField::Sparse(n, vec, FiniteRing::new(n, 0))
     }
 
     pub fn as_dense(self: &BitField) -> BitField {
@@ -164,6 +183,21 @@ impl BitField {
         match self {
             BitField::Sparse(n, ..) => *n,
             BitField::Dense(n, ..) => *n,
+        }
+    }
+
+    pub fn hamming_weight(self: &Self) -> usize {
+        match self {
+            BitField::Sparse(_, vec, _) => vec.len(),
+            BitField::Dense(n, bitfield) => {
+                let mut count = 0;
+                for i in 0..*n {
+                    if bitfield.tstbit(i) {
+                        count += 1;
+                    }
+                }
+                count
+            }
         }
     }
 }
@@ -503,5 +537,25 @@ mod tests {
         let y = BitField::new_sparse_from_str("10011");
         x /= &y;
         assert_eq!(x.to_string(), "10000");
+    }
+
+    #[test]
+    fn hamming_weight() {
+        let x = BitField::new_sparse_from_str("110");
+        let y = BitField::new_sparse_from_str("11101010");
+        let z = BitField::new_sparse_from_str("11000111010101");
+        let w = BitField::new_sparse_from_str("1101111");
+        assert_eq!(x.hamming_weight(), 2);
+        assert_eq!(y.hamming_weight(), 5);
+        assert_eq!(z.hamming_weight(), 8);
+        assert_eq!(w.hamming_weight(), 6);
+    }
+
+    #[test]
+    fn new_uniform_random() {
+        for _ in 0..1000 {
+            let x = BitField::new_uniform_random(44497, 128);
+            assert_eq!(x.hamming_weight(), 128);
+        }
     }
 }
