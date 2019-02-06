@@ -415,6 +415,13 @@ mod tests {
     }
 
     #[test]
+    fn dense_to_sparse() {
+        let dense_field = BitField::new_dense_from_str("10010");
+        let sparse_field = dense_field.as_sparse();
+        assert_eq!(sparse_field.to_string(), "10010");
+    }
+
+    #[test]
     fn add_assign_without_overflow() {
         let mut x = BitField::new_sparse_from_str("101");
         let y = BitField::new_sparse_from_str("001");
