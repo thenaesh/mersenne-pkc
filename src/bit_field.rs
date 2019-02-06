@@ -71,6 +71,8 @@ impl BitField {
             }
         }
 
+        vec.sort_unstable();
+
         BitField::Sparse(n, vec, FiniteRing::new(n, 0))
     }
 
@@ -199,6 +201,14 @@ impl BitField {
                 count
             }
         }
+    }
+
+    pub fn all_set_bits(self: &Self) -> Vec<usize> {
+        let sparse_field = self.as_sparse();
+        let (_, vec, _) = sparse_field.unwrap_sparse();
+        let mut vec = vec.clone();
+        vec.sort_unstable();
+        vec
     }
 }
 

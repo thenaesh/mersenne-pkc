@@ -18,8 +18,8 @@ fn main() {
     let c = encrypt(msg, pub_key, h);
     let (aa, bb) = decrypt(c, pri_key, h);
 
-    println!("Original A Bits : {:?}", a.set_bits());
-    println!("Decrypted A Bits: {:?}", aa.set_bits());
-    println!("Original B Bits : {:?}", b.set_bits());
-    println!("Decrypted B Bits: {:?}", bb.set_bits());
+    println!("Original A Bits : {:?}", a.all_set_bits());
+    println!("Decrypted A Bits: {:?}", aa.all_set_bits());
+    println!("Original B Bits : {:?}", b.all_set_bits());
+    println!("Decrypted B Bits: {:?}", bb.all_set_bits());
 }

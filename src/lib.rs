@@ -1,4 +1,4 @@
-mod finite_ring;
+pub mod finite_ring;
 pub mod mersenne_field;
 pub mod bit_field;
 
@@ -6,20 +6,21 @@ use std::time::SystemTime;
 use std::cmp::min;
 use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
-use crate::mersenne_field::MersenneField;
+use crate::bit_field::BitField;
+use crate::finite_ring::FiniteRing;
 
-pub type PublicKey = MersenneField;
-pub type PrivateKey = (MersenneField, MersenneField);
+pub type PublicKey = BitField;
+pub type PrivateKey = (BitField, BitField);
 
-pub type PlainText = (MersenneField, MersenneField);
-pub type CipherText = MersenneField;
+pub type PlainText = (BitField, BitField);
+pub type CipherText = BitField;
 
 const N_WORKERS: usize = 8;
 const N_JOBS: usize = 8;
 
 pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
-    let a = MersenneField::new_uniform_random(n, h);
-    let b = MersenneField::new_uniform_random(n, h);
+    let a = BitField::new_uniform_random(n, h);
+    let b = BitField::new_uniform_random(n, h);
 
     (a, b)
 }
@@ -80,21 +81,13 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
         println!("Obtained {} out of {} indices for B... Elapsed Time: {}s", g_indices.len(), h, start_time.elapsed().unwrap().as_secs());
     }
 
-    let mut a = MersenneField::new(n);
-    let mut b = MersenneField::new(n);
-
-    for idx in f_indices {
-        a.bits.setbit(idx);
-    }
-
-    for idx in g_indices {
-        b.bits.setbit(idx);
-    }
+    let a = BitField::Sparse(n, f_indices, FiniteRing::new(n, 0));
+    let b = BitField::Sparse(n, g_indices, FiniteRing::new(n, 0));
 
     (a, b)
 }
 
-fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField, pool: &mut ThreadPool) -> Vec<(usize, usize)> {
+fn pick_smallest_subtraction_powers(z: &BitField, s: &BitField, pool: &mut ThreadPool) -> Vec<(usize, usize)> {
     let n = z.len();
     let n_items_per_job = (n / N_JOBS) + 1;
 
@@ -128,7 +121,7 @@ fn pick_smallest_subtraction_powers(z: &MersenneField, s: &MersenneField, pool: 
     result
 }
 
-fn shift_and_subtract(z: &MersenneField, s: &MersenneField, idx: usize) -> MersenneField {
+fn shift_and_subtract(z: &BitField, s: &BitField, idx: usize) -> BitField {
     let mut d_i = z.clone();
     let mut ss = s.clone();
     ss <<= idx;
