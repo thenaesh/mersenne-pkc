@@ -4,6 +4,7 @@ use std::vec::Vec;
 use std::iter::Iterator;
 use std::collections::HashSet;
 use std::i64;
+use std::time::SystemTime;
 extern crate plotlib;
 use plotlib::scatter::Scatter;
 use plotlib::scatter;
@@ -12,13 +13,19 @@ use plotlib::view::View;
 use plotlib::page::Page;
 
 fn main() {
-    let n = 19937;
-    let h = 64;
+    let ns = vec![2203, 2281, 3217, 4253, 4423, 9689, 9941, 11213, 19937, 21701, 23209, 44497, 86243];
+    let hs = vec![32, 64, 128];
 
-    generate_and_plot(n, h);
+    for h in hs.iter() {
+        for n in ns.iter() {
+            generate_and_plot(*n, *h)
+        }
+    }
 }
 
 fn generate_and_plot(n: usize, h: usize) {
+    let start_time = SystemTime::now();
+
     let (f, g) = randomly_generate_message(n, h);
     println!("F, G: {:?}, {:?}", f.all_set_bits(), g.all_set_bits());
 
@@ -43,6 +50,7 @@ fn generate_and_plot(n: usize, h: usize) {
 
     plot_graph(&format!("graphs/f_plot_{}_{}.svg", n.to_string(), h.to_string()), n, f_deltas, a_bits);
     plot_graph(&format!("graphs/g_plot_{}_{}.svg", n.to_string(), h.to_string()), n, g_deltas, b_bits);
+    println!("Elapsed Time: {}s", start_time.elapsed().unwrap().as_secs());
 }
 
 fn delta(minuend: &BitField, subtrahend: &BitField, shift_amt: usize) -> i64 {
