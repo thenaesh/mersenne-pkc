@@ -1,4 +1,6 @@
 use std::vec::Vec;
+use std::collections::HashSet;
+use std::cmp::{min, max};
 use std::iter::Iterator;
 use std::ops::Index;
 use std::ops::{ShlAssign, ShrAssign, AddAssign, SubAssign, MulAssign, DivAssign};
@@ -167,6 +169,14 @@ impl BitField {
         }
     }
 
+    pub fn extend(mut self: Self, k: usize) -> Self {
+        self.normalize();
+        match self {
+            BitField::Dense(..) => self,
+            BitField::Sparse(n, vec, _) => BitField::Sparse(n+1, vec, FiniteRing::new(n+k, 0)),
+        }
+    }
+
     pub fn set(self: &mut Self, idx: usize) {
         match self {
             BitField::Sparse(n, vec, offset) => {
@@ -191,12 +201,14 @@ impl BitField {
     pub fn normalize(self: &mut Self) {
         match self {
             BitField::Dense(..) => {},
+            BitField::Sparse(_, _, FiniteRing { modulus: _, val: 0 }) => {},
             BitField::Sparse(n, vec, offset) => {
                 for i in 0..vec.len() {
                     let x = FiniteRing::new(*n, vec[i]) - *offset;
                     vec[i] = x.val;
                 }
                 *offset = FiniteRing::new(*n, 0);
+                vec.sort_unstable();
             }
         }
     }
@@ -234,29 +246,55 @@ impl BitField {
         vec
     }
 
-    pub fn hamming_weight_change_upon_subtraction(self: &Self, other: &mut Self) -> i64 {
-        other.normalize();
-
-        let (n, bitstring) = self.unwrap_dense();
-        let (m, vec, offset) = other.unwrap_sparse();
+    /*
+     * PRECONDITIONS:
+     * 1) minuend must be greater than or equal to subtrahend
+     * 2) minuend must be sparse and normalized
+     * 3) subtrahend must be sparse and normalized
+     *
+     * Note that self is the minuend and other is the subtrahend.
+     */
+    pub fn hamming_weight_change_upon_subtraction(self: &Self, other: Self) -> i64 {
+        let (n, minuend_vec, _) = self.unwrap_sparse();
+        let (m, subtrahend_vec, _) = other.unwrap_sparse();
 
         if n != m {
             panic!("Bitstrings of different length unexpected!");
         }
 
-        let l = vec.len();
-        let mut delta = 0;
+        let l = subtrahend_vec.len();
+        let mut stop_mark = n;
+        let mut skip_marks = HashSet::<usize>::new();
+
+        let mut delta = 0 as i64;
 
         for i in 0..l {
-            let idx = vec[i];
-            if bitstring.tstbit(idx) {
-                delta -= 1;
-            } else {
-                // TODO: handle general case
+            let i = l - 1 - i;
+
+            let idx = subtrahend_vec[i];
+            match minuend_vec.binary_search(&idx) {
+                Ok(_) => {
+                    // minuend[idx] = 1, subtrahend[idx] = 1
+                    delta -= 1;
+                    skip_marks.insert(idx);
+                },
+                Err(j) => {
+                    // minuend[idx] = 0, subtrahend[idx] = 1
+                    let mut j = j;
+                    while skip_marks.contains(&minuend_vec[j]) {
+                        j += 1;
+                    }
+
+                    let minuend_idx = min(minuend_vec[j], stop_mark) as i64;
+                    let subtrahend_idx = idx as i64;
+
+                    delta += minuend_idx - subtrahend_idx - 1;
+                    stop_mark = idx as usize;
+                },
             }
         }
 
-        delta
+        -delta
     }
 }
 
@@ -632,6 +670,7 @@ mod tests {
     fn normalize() {
         let mut x = BitField::new_sparse_from_str("11011");
         let vec = x.all_set_bits();
+        x.normalize();
         assert_eq!(vec.len(), 4);
         assert_eq!(vec[0], 0);
         assert_eq!(vec[1], 1);
@@ -659,5 +698,65 @@ mod tests {
             let x = BitField::new_uniform_random(44497, 128);
             assert_eq!(x.hamming_weight(), 128);
         }
+    }
+
+    #[test]
+    fn hamming_weight_change_upon_subtraction() {
+        let minuend = BitField::new_sparse_from_str("100000");
+        let subtrahend = BitField::new_sparse_from_str("000101");
+        let mut difference = minuend.clone();
+        difference -= &subtrahend;
+        let expected_hamming_weight_change = (difference.hamming_weight() as i64) - (minuend.hamming_weight() as i64);
+        let actual_hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+        assert_eq!(-expected_hamming_weight_change, actual_hamming_weight_change);
+        let minuend = BitField::new_sparse_from_str("10000");
+        let subtrahend = BitField::new_sparse_from_str("00101");
+        let mut difference = minuend.clone();
+        difference -= &subtrahend;
+        let expected_hamming_weight_change = (difference.hamming_weight() as i64) - (minuend.hamming_weight() as i64);
+        let actual_hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+        assert_eq!(-expected_hamming_weight_change, actual_hamming_weight_change);
+        let minuend = BitField::new_sparse_from_str("1000100");
+        let subtrahend = BitField::new_sparse_from_str("0001101");
+        let mut difference = minuend.clone();
+        difference -= &subtrahend;
+        let expected_hamming_weight_change = (difference.hamming_weight() as i64) - (minuend.hamming_weight() as i64);
+        let actual_hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+        assert_eq!(-expected_hamming_weight_change, actual_hamming_weight_change);
+        let minuend = BitField::new_sparse_from_str("1001100");
+        let subtrahend = BitField::new_sparse_from_str("0101101");
+        let mut difference = minuend.clone();
+        difference -= &subtrahend;
+        let expected_hamming_weight_change = (difference.hamming_weight() as i64) - (minuend.hamming_weight() as i64);
+        let actual_hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+        assert_eq!(-expected_hamming_weight_change, actual_hamming_weight_change);
+        let minuend = BitField::new_sparse_from_str("1011100");
+        let subtrahend = BitField::new_sparse_from_str("0101101");
+        let mut difference = minuend.clone();
+        difference -= &subtrahend;
+        let expected_hamming_weight_change = (difference.hamming_weight() as i64) - (minuend.hamming_weight() as i64);
+        let actual_hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+        assert_eq!(-expected_hamming_weight_change, actual_hamming_weight_change);
+        let minuend = BitField::new_sparse_from_str("101110011010101");
+        let subtrahend = BitField::new_sparse_from_str("100110100101001");
+        let mut difference = minuend.clone();
+        difference -= &subtrahend;
+        let expected_hamming_weight_change = (difference.hamming_weight() as i64) - (minuend.hamming_weight() as i64);
+        let actual_hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+        assert_eq!(-expected_hamming_weight_change, actual_hamming_weight_change);
+        let minuend = BitField::new_sparse_from_str("101110011000000");
+        let subtrahend = BitField::new_sparse_from_str("100110100101011");
+        let mut difference = minuend.clone();
+        difference -= &subtrahend;
+        let expected_hamming_weight_change = (difference.hamming_weight() as i64) - (minuend.hamming_weight() as i64);
+        let actual_hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+        assert_eq!(-expected_hamming_weight_change, actual_hamming_weight_change);
+        let minuend = BitField::new_sparse_from_str("101110011000000");
+        let subtrahend = BitField::new_sparse_from_str("100111111111111");
+        let mut difference = minuend.clone();
+        difference -= &subtrahend;
+        let expected_hamming_weight_change = (difference.hamming_weight() as i64) - (minuend.hamming_weight() as i64);
+        let actual_hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+        assert_eq!(-expected_hamming_weight_change, actual_hamming_weight_change);
     }
 }
