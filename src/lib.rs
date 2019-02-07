@@ -87,7 +87,41 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     (a, b)
 }
 
-fn pick_smallest_subtraction_powers(z: &BitField, s: &BitField, pool: &mut ThreadPool) -> Vec<(usize, i64)> {
+fn pick_smallest_subtraction_powers(z: &BitField, s: &BitField, pool: &mut ThreadPool) -> Vec<(usize, usize)> {
+    let n = z.len();
+    let n_items_per_job = (n / N_JOBS) + 1;
+
+    let (tx, rx) = channel();
+    for i in 0..N_JOBS {
+        let z = z.clone();
+        let s = s.clone();
+
+        let tx = tx.clone();
+        pool.execute(move || {
+            let start_idx = i * n_items_per_job;
+            let end_idx = min(n, start_idx + n_items_per_job);
+
+            let mut subtraction_powers_and_values = (start_idx..end_idx)
+                .map(|idx| {
+                    let d_i = shift_and_subtract(&z, &s, idx);
+                    (idx, d_i.hamming_weight())
+                })
+                .collect::<Vec<(usize, usize)>>();
+
+            subtraction_powers_and_values.sort_unstable_by_key(|p| p.1);
+            tx.send(subtraction_powers_and_values[0]);
+        });
+    }
+
+    let mut result: Vec<(usize, usize)> = Vec::new();
+    for p in rx.iter().take(N_JOBS) {
+        result.push(p);
+    }
+    result.sort_unstable_by_key(|p| p.1);
+    result
+}
+
+fn pick_smallest_subtraction_powers_efficient(z: &BitField, s: &BitField, pool: &mut ThreadPool) -> Vec<(usize, i64)> {
     let n = z.len();
     let n_items_per_job = (n / N_JOBS) + 1;
 
