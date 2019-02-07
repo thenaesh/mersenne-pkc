@@ -188,6 +188,19 @@ impl BitField {
         }
     }
 
+    pub fn normalize(self: &mut Self) {
+        match self {
+            BitField::Dense(..) => {},
+            BitField::Sparse(n, vec, offset) => {
+                for i in 0..vec.len() {
+                    let x = FiniteRing::new(*n, vec[i]) - *offset;
+                    vec[i] = x.val;
+                }
+                *offset = FiniteRing::new(*n, 0);
+            }
+        }
+    }
+
     pub fn hamming_weight(self: &Self) -> usize {
         match self {
             BitField::Sparse(_, vec, _) => vec.len(),
@@ -221,9 +234,29 @@ impl BitField {
         vec
     }
 
-    pub fn hamming_weight_change_upon_subtraction(self: &Self, other: &Self) {
-        let self_vec = self.all_set_bits();
-        let other_vec = other.all_set_bits();
+    pub fn hamming_weight_change_upon_subtraction(self: &Self, other: &mut Self) -> i64 {
+        other.normalize();
+
+        let (n, bitstring) = self.unwrap_dense();
+        let (m, vec, offset) = other.unwrap_sparse();
+
+        if n != m {
+            panic!("Bitstrings of different length unexpected!");
+        }
+
+        let l = vec.len();
+        let mut delta = 0;
+
+        for i in 0..l {
+            let idx = vec[i];
+            if bitstring.tstbit(idx) {
+                delta -= 1;
+            } else {
+                // TODO: handle general case
+            }
+        }
+
+        delta
     }
 }
 
@@ -576,6 +609,7 @@ mod tests {
         assert_eq!(w.hamming_weight(), 6);
     }
 
+
     #[test]
     fn all_set_bits() {
         let mut x = BitField::new_sparse_from_str("11011");
@@ -586,6 +620,31 @@ mod tests {
         assert_eq!(vec[2], 3);
         assert_eq!(vec[3], 4);
         x <<= 1;
+        let vec = x.all_set_bits();
+        assert_eq!(vec.len(), 4);
+        assert_eq!(vec[0], 0);
+        assert_eq!(vec[1], 1);
+        assert_eq!(vec[2], 2);
+        assert_eq!(vec[3], 4);
+    }
+
+    #[test]
+    fn normalize() {
+        let mut x = BitField::new_sparse_from_str("11011");
+        let vec = x.all_set_bits();
+        assert_eq!(vec.len(), 4);
+        assert_eq!(vec[0], 0);
+        assert_eq!(vec[1], 1);
+        assert_eq!(vec[2], 3);
+        assert_eq!(vec[3], 4);
+        x <<= 1;
+        let vec = x.all_set_bits();
+        assert_eq!(vec.len(), 4);
+        assert_eq!(vec[0], 0);
+        assert_eq!(vec[1], 1);
+        assert_eq!(vec[2], 2);
+        assert_eq!(vec[3], 4);
+        x.normalize();
         let vec = x.all_set_bits();
         assert_eq!(vec.len(), 4);
         assert_eq!(vec[0], 0);
