@@ -15,8 +15,8 @@ pub type PrivateKey = (BitField, BitField);
 pub type PlainText = (BitField, BitField);
 pub type CipherText = BitField;
 
-const N_WORKERS: usize = 8;
-const N_JOBS: usize = 8;
+const N_WORKERS: usize = 2;
+const N_JOBS: usize = 2;
 
 pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
     let a = BitField::new_uniform_random(n, h);
@@ -87,14 +87,18 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     (a, b)
 }
 
-fn pick_smallest_subtraction_powers(z: &BitField, s: &BitField, pool: &mut ThreadPool) -> Vec<(usize, usize)> {
+fn pick_smallest_subtraction_powers(z: &BitField, s: &BitField, pool: &mut ThreadPool) -> Vec<(usize, i64)> {
     let n = z.len();
     let n_items_per_job = (n / N_JOBS) + 1;
 
+    // ensure z >= s
+    let mut z = z.clone();
+    z.normalize();
+
     let (tx, rx) = channel();
     for i in 0..N_JOBS {
-        let z = z.clone();
-        let s = s.clone();
+        let z = z.as_sparse();
+        let s = s.as_sparse();
 
         let tx = tx.clone();
         pool.execute(move || {
@@ -103,17 +107,23 @@ fn pick_smallest_subtraction_powers(z: &BitField, s: &BitField, pool: &mut Threa
 
             let mut subtraction_powers_and_values = (start_idx..end_idx)
                 .map(|idx| {
+                    /*
                     let d_i = shift_and_subtract(&z, &s, idx);
                     (idx, d_i.hamming_weight())
+                    */
+                    let mut s = s.clone();
+                    s <<= idx;
+                    s.normalize();
+                    (idx, z.hamming_weight_change_upon_subtraction(s))
                 })
-                .collect::<Vec<(usize, usize)>>();
+                .collect::<Vec<(usize, i64)>>();
 
             subtraction_powers_and_values.sort_unstable_by_key(|p| p.1);
             tx.send(subtraction_powers_and_values[0]);
         });
     }
 
-    let mut result: Vec<(usize, usize)> = Vec::new();
+    let mut result: Vec<(usize, i64)> = Vec::new();
     for p in rx.iter().take(N_JOBS) {
         result.push(p);
     }
