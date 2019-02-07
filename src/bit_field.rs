@@ -204,11 +204,26 @@ impl BitField {
     }
 
     pub fn all_set_bits(self: &Self) -> Vec<usize> {
-        let sparse_field = self.as_sparse();
-        let (_, vec, _) = sparse_field.unwrap_sparse();
-        let mut vec = vec.clone();
+        let mut vec = match self {
+            BitField::Sparse(n, vec, offset) => vec.iter().map(|x| (FiniteRing::new(*n, *x) - *offset).val).collect(),
+            BitField::Dense(n, bitstring) => {
+                let mut vec = Vec::new();
+                for i in 0..*n {
+                    if bitstring.tstbit(i) {
+                        vec.push(i);
+                    }
+                }
+                vec
+            }
+        };
+
         vec.sort_unstable();
         vec
+    }
+
+    pub fn hamming_weight_change_upon_subtraction(self: &Self, other: &Self) {
+        let self_vec = self.all_set_bits();
+        let other_vec = other.all_set_bits();
     }
 }
 
@@ -559,6 +574,24 @@ mod tests {
         assert_eq!(y.hamming_weight(), 5);
         assert_eq!(z.hamming_weight(), 8);
         assert_eq!(w.hamming_weight(), 6);
+    }
+
+    #[test]
+    fn all_set_bits() {
+        let mut x = BitField::new_sparse_from_str("11011");
+        let vec = x.all_set_bits();
+        assert_eq!(vec.len(), 4);
+        assert_eq!(vec[0], 0);
+        assert_eq!(vec[1], 1);
+        assert_eq!(vec[2], 3);
+        assert_eq!(vec[3], 4);
+        x <<= 1;
+        let vec = x.all_set_bits();
+        assert_eq!(vec.len(), 4);
+        assert_eq!(vec[0], 0);
+        assert_eq!(vec[1], 1);
+        assert_eq!(vec[2], 2);
+        assert_eq!(vec[3], 4);
     }
 
     #[test]
