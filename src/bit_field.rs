@@ -246,6 +246,15 @@ impl BitField {
         vec
     }
 
+    pub fn all_set_bits_hashset(self: &Self) -> HashSet<usize> {
+        let vec = self.all_set_bits();
+        let mut hashset = HashSet::new();
+        for i in vec {
+            hashset.insert(i);
+        }
+        hashset
+    }
+
     /*
      * PRECONDITIONS:
      * 1) minuend must be greater than or equal to subtrahend
