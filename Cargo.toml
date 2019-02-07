@@ -17,3 +17,4 @@ doc = false
 rand = "0.6.4"
 rust-gmp = "0.5.0"
 threadpool = "1.7.1"
+plotlib = "0.3.0"
