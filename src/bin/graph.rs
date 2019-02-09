@@ -13,8 +13,8 @@ use plotlib::view::View;
 use plotlib::page::Page;
 
 fn main() {
-    let ns = vec![2203, 2281, 3217, 4253, 4423, 9689, 9941, 11213, 19937, 21701, 23209, 44497, 86243];
-    let hs = vec![32, 64, 128];
+    let ns = vec![44497, 86243];
+    let hs = vec![64, 128];
 
     for h in hs.iter() {
         for n in ns.iter() {
