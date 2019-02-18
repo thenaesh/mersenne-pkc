@@ -3,6 +3,10 @@ pub mod bit_field;
 
 use std::iter::Iterator;
 
+extern crate crypto;
+use crypto::digest::Digest;
+use crypto::sha3::Sha3;
+
 use crate::bit_field::BitField;
 
 pub type PublicKey = BitField;
@@ -10,6 +14,13 @@ pub type PrivateKey = (BitField, BitField);
 
 pub type PlainText = (BitField, BitField);
 pub type CipherText = BitField;
+
+pub fn extract_session_key((a, b): &PlainText) -> String {
+    let input_str = a.to_string() + &b.to_string();
+    let mut hasher = Sha3::sha3_256();
+    hasher.input_str(&input_str);
+    hasher.result_str()
+}
 
 pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
     let a = BitField::new_uniform_random(n, h);

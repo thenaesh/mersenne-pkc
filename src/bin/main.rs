@@ -21,4 +21,10 @@ fn main() {
     println!("Decrypted A Bits: {:?}", aa.all_set_bits());
     println!("Original B Bits : {:?}", b.all_set_bits());
     println!("Decrypted B Bits: {:?}", bb.all_set_bits());
+
+    let alice_session_key = extract_session_key(&(a,b));
+    let bob_session_key = extract_session_key(&(aa, bb));
+
+    println!("Alice\'s Session Key : {}", alice_session_key);
+    println!("Bob\'s Session Key   : {}", bob_session_key);
 }
