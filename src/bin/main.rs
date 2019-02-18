@@ -1,8 +1,8 @@
 use mersennepkc::*;
 
 fn main() {
-    let n = 9689;
-    let h = 32;
+    let n = 86243;
+    let h = 128;
 
     let (f, g) = randomly_generate_message(n, h);
     println!("F, G: {}, {}", f.to_string(), g.to_string());
