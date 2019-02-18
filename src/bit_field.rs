@@ -201,7 +201,9 @@ impl BitField {
     pub fn normalize(self: &mut Self) {
         match self {
             BitField::Dense(..) => {},
-            BitField::Sparse(_, _, FiniteRing { modulus: _, val: 0 }) => {},
+            BitField::Sparse(_, vec, FiniteRing { modulus: _, val: 0 }) => {
+                vec.sort_unstable();
+            },
             BitField::Sparse(n, vec, offset) => {
                 for i in 0..vec.len() {
                     let x = FiniteRing::new(*n, vec[i]) - *offset;

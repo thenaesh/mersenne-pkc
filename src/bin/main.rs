@@ -5,7 +5,6 @@ fn main() {
     let h = 128;
 
     let (f, g) = randomly_generate_message(n, h);
-    println!("F, G: {}, {}", f.to_string(), g.to_string());
 
     let mut pub_key = f.clone();
     pub_key /= &g;
