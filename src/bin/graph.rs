@@ -14,22 +14,18 @@ use plotlib::style::{Marker, Point};
 use plotlib::view::View;
 use plotlib::page::Page;
 
-fn main() {
-    let ns = vec![86243];
-    let hs = vec![128];
+const N: usize = 86243;
+const H: usize = 128;
 
+fn main() {
     let start_time = SystemTime::now();
 
-    for h in hs.iter() {
-        for n in ns.iter() {
-            println!("n = {}, h = {}", *n, *h);
-            let (ex_mean, ex_var, unex_max_mean, unex_max_var, ex_min_mean, ex_min_var, ex_max_mean, ex_max_var) = generate_and_plot_frequencies(*n, *h);
-            println!("Expected Points: mean = {}, stddev = {}", ex_mean, ex_var.sqrt());
-            println!("Unexpected Max Points: mean = {}, stddev = {}", unex_max_mean, unex_max_var.sqrt());
-            println!("Expected Min Points: mean = {}, stddev = {}", ex_min_mean, ex_min_var.sqrt());
-            println!("Expected Max Points: mean = {}, stddev = {}", ex_max_mean, ex_max_var.sqrt());
-        }
-    }
+    println!("n = {}, h = {}", N, H);
+    let (ex_mean, ex_var, unex_max_mean, unex_max_var, ex_min_mean, ex_min_var, ex_max_mean, ex_max_var) = generate_and_plot_frequencies(N, H);
+    println!("Expected Points: mean = {}, stddev = {}", ex_mean, ex_var.sqrt());
+    println!("Unexpected Max Points: mean = {}, stddev = {}", unex_max_mean, unex_max_var.sqrt());
+    println!("Expected Min Points: mean = {}, stddev = {}", ex_min_mean, ex_min_var.sqrt());
+    println!("Expected Max Points: mean = {}, stddev = {}", ex_max_mean, ex_max_var.sqrt());
 
     println!("Elapsed Time: {}s", start_time.elapsed().unwrap().as_secs());
 }
@@ -40,7 +36,7 @@ fn generate_and_plot_frequencies(n: usize, h: usize) -> (f64, f64, f64, f64, f64
     let mut expected_min_frequency_map = HashMap::<i64, usize>::new();
     let mut expected_max_frequency_map = HashMap::<i64, usize>::new();
 
-    for i in 0..5000 {
+    for i in 0..1000 {
         let (xs, y, w, z) = generate_reductions(n, h);
 
         unexpected_max_frequency_map.insert(y, match unexpected_max_frequency_map.get(&y) {
@@ -137,36 +133,6 @@ fn generate_and_plot_frequencies(n: usize, h: usize) -> (f64, f64, f64, f64, f64
         expected_max_points_sample_mean, expected_max_points_sample_variance)
 }
 
-fn generate_and_plot_points(n: usize, h: usize) {
-    let start_time = SystemTime::now();
-
-    let (f, g) = randomly_generate_message(n, h);
-    println!("F, G: {:?}, {:?}", f.all_set_bits(), g.all_set_bits());
-
-    let mut pub_key = f.clone();
-    pub_key /= &g;
-
-    let msg = randomly_generate_message(n, h);
-    let (a,b) = msg.clone();
-
-    let mut c = encrypt(msg, pub_key, h);
-    c *= &g;
-
-    let mut c = c.extend(1);
-    c.make_sparse();
-    c.set(n);
-
-    let f_deltas: Vec<(usize, i64)> = (0..n).map(|i| (i, delta_efficient(&c, &f, i))).collect();
-    let a_bits = a.all_set_bits_hashset();
-
-    let g_deltas: Vec<(usize, i64)> = (0..n).map(|i| (i, delta_efficient(&c, &g, i))).collect();
-    let b_bits = b.all_set_bits_hashset();
-
-    plot_points(&format!("graphs/f_plot_{}_{}.svg", n.to_string(), h.to_string()), n, f_deltas, a_bits);
-    plot_points(&format!("graphs/g_plot_{}_{}.svg", n.to_string(), h.to_string()), n, g_deltas, b_bits);
-    println!("Elapsed Time: {}s", start_time.elapsed().unwrap().as_secs());
-}
-
 fn plot_frequencies(output_filename: &str, expected_points: &Vec<(f64, f64)>, unexpected_max_points: &Vec<(f64, f64)>, expected_min_points: &Vec<(f64, f64)>, expected_max_points: &Vec<(f64, f64)>) {
     println!("Plotting Frequency Graph: {}", output_filename);
 
@@ -216,6 +182,39 @@ fn plot_frequencies(output_filename: &str, expected_points: &Vec<(f64, f64)>, un
     println!("Done");
 }
 
+/*
+fn generate_and_plot_points(n: usize, h: usize) {
+    let start_time = SystemTime::now();
+
+    let (f, g) = randomly_generate_message(n, h);
+    println!("F, G: {:?}, {:?}", f.all_set_bits(), g.all_set_bits());
+
+    let mut pub_key = f.clone();
+    pub_key /= &g;
+
+    let msg = randomly_generate_message(n, h);
+    let (a,b) = msg.clone();
+
+    let mut c = encrypt(msg, pub_key);
+    c *= &g;
+
+    let mut c = c.extend(1);
+    c.make_sparse();
+    c.set(n);
+
+    let f_deltas: Vec<(usize, i64)> = (0..n).map(|i| (i, delta_efficient(&c, &f, i))).collect();
+    let a_bits = a.all_set_bits_hashset();
+
+    let g_deltas: Vec<(usize, i64)> = (0..n).map(|i| (i, delta_efficient(&c, &g, i))).collect();
+    let b_bits = b.all_set_bits_hashset();
+
+    plot_points(&format!("graphs/f_plot_{}_{}.svg", n.to_string(), h.to_string()), n, f_deltas, a_bits);
+    plot_points(&format!("graphs/g_plot_{}_{}.svg", n.to_string(), h.to_string()), n, g_deltas, b_bits);
+    println!("Elapsed Time: {}s", start_time.elapsed().unwrap().as_secs());
+}
+*/
+
+/*
 fn plot_points(output_filename: &str, n: usize, deltas: Vec<(usize, i64)>, expected_point_indices: HashSet<usize>) {
     println!("Plotting Point Graph: {}", output_filename);
 
@@ -251,6 +250,7 @@ fn plot_points(output_filename: &str, n: usize, deltas: Vec<(usize, i64)>, expec
 
     println!("Done");
 }
+*/
 
 fn generate_reductions(n: usize, h: usize) -> (Vec<i64>, i64, i64, i64) {
     let (f, g) = randomly_generate_message(n, h);
@@ -261,7 +261,7 @@ fn generate_reductions(n: usize, h: usize) -> (Vec<i64>, i64, i64, i64) {
     let msg = randomly_generate_message(n, h);
     let (a,b) = msg.clone();
 
-    let mut c = encrypt(msg, pub_key, h);
+    let mut c = encrypt(msg, pub_key);
     c *= &g;
 
     let mut c = c.extend(1);
