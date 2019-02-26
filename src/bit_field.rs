@@ -173,7 +173,20 @@ impl BitField {
         self.normalize();
         match self {
             BitField::Dense(n, bitstring) => BitField::Dense(n+k, bitstring),
-            BitField::Sparse(n, vec, _) => BitField::Sparse(n+1, vec, FiniteRing::new(n+k, 0)),
+            BitField::Sparse(n, vec, _) => BitField::Sparse(n+k, vec, FiniteRing::new(n+k, 0)),
+        }
+    }
+
+    pub fn extend_self(self: &mut Self, k: usize) {
+        self.normalize();
+        match self {
+            BitField::Dense(n, bitstring) => {
+                *n += k;
+            },
+            BitField::Sparse(n, vec, modulus) => {
+                *n += k;
+                *modulus = FiniteRing::new(*n + k, 0);
+            },
         }
     }
 

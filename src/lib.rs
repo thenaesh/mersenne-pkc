@@ -45,15 +45,11 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     f.make_sparse();
     g.make_sparse();
 
-    let mut z = c.clone();
-    z *= &g;
-    let mut z = z.extend(1);
-    z.make_sparse();
-    z.set(n);
-    z.normalize();
+    let mut cg = c.clone();
+    cg *= &g;
 
-    let potential_a_bits = get_hamming_weight_changes_on_subtraction(&z, &f);
-    let potential_b_bits = get_hamming_weight_changes_on_subtraction(&z, &g);
+    let potential_a_bits = get_hamming_weight_changes_on_subtraction(&cg, &f);
+    let potential_b_bits = get_hamming_weight_changes_on_subtraction(&cg, &g);
 
     let mut a = BitField::new_dense(n);
     let mut b = BitField::new_dense(n);
@@ -69,18 +65,11 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     let mut tmp_bg = b.clone();
     tmp_af *= &f;
     tmp_bg *= &g;
+    cg -= &tmp_af;
+    cg -= &tmp_bg;
 
-    let mut z = c.clone();
-    z *= &g;
-    z -= &tmp_af;
-    z -= &tmp_bg;
-    let mut z = z.extend(1);
-    z.make_sparse();
-    z.set(n);
-    z.normalize();
-
-    let potential_a_bits = get_hamming_weight_changes_on_subtraction(&z, &f);
-    let potential_b_bits = get_hamming_weight_changes_on_subtraction(&z, &g);
+    let potential_a_bits = get_hamming_weight_changes_on_subtraction(&cg, &f);
+    let potential_b_bits = get_hamming_weight_changes_on_subtraction(&cg, &g);
 
     for idx in 0..h/2 {
         let (i, _) = potential_a_bits[idx];
@@ -92,14 +81,44 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     (a, b)
 }
 
+pub fn get_possible_coefficient_bits(minuend: &BitField, subtrahend: &BitField, threshold: i64) -> Vec<usize> {
+    let mut result = Vec::new();
+
+    let n = minuend.len();
+    let mut minuend = minuend.clone();
+    minuend.extend_self(1);
+    minuend.make_sparse();
+    minuend.set(n);
+    minuend.normalize();
+
+    for i in 0..n {
+        let mut subtrahend = subtrahend.clone();
+        subtrahend <<= i;
+        subtrahend.normalize();
+        subtrahend.extend_self(1);
+        let hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+        if hamming_weight_change >= threshold {
+            result.push(i)
+        }
+    }
+
+    result
+}
+
 pub fn get_hamming_weight_changes_on_subtraction(minuend: &BitField, subtrahend: &BitField) -> Vec<(usize, i64)> {
     let n = minuend.len();
+
+    let mut minuend = minuend.clone();
+    minuend.extend_self(1);
+    minuend.make_sparse();
+    minuend.set(n);
+    minuend.normalize();
 
     let mut result: Vec<(usize, i64)> = (0..n).map(|i| {
         let mut subtrahend = subtrahend.clone();
         subtrahend <<= i;
         subtrahend.normalize();
-        let subtrahend = subtrahend.extend(1);
+        subtrahend.extend_self(1);
         let hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
         (i, hamming_weight_change)
     }).collect();
