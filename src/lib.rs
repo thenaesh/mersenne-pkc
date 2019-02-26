@@ -37,36 +37,6 @@ pub fn encrypt(m: PlainText, pub_key: PublicKey, h: usize) -> CipherText {
     c
 }
 
-pub fn decrypt_onepass(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
-    let n = c.len();
-
-    let (mut f, mut g) = pri_key;
-    f.make_sparse();
-    g.make_sparse();
-
-    let mut z = c;
-    z *= &g;
-    let mut z = z.extend(1);
-    z.make_sparse();
-    z.set(n);
-    z.normalize();
-
-    let potential_a_bits = get_hamming_weight_changes_on_subtraction(&z, &f);
-    let potential_b_bits = get_hamming_weight_changes_on_subtraction(&z, &g);
-
-    let mut a = BitField::new_dense(n);
-    let mut b = BitField::new_dense(n);
-
-    for idx in 0..h {
-        let (i, _) = potential_a_bits[idx];
-        let (j, _) = potential_b_bits[idx];
-        a.set(i);
-        b.set(j);
-    }
-
-    (a, b)
-}
-
 // currently does 2 passes
 pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     let n = c.len();
