@@ -14,8 +14,8 @@ fn main() {
     let msg = randomly_generate_message(n, h);
     let (a,b) = msg.clone();
 
-    let c = encrypt(msg, pub_key, h);
-    let (aa, bb) = decrypt(c, pri_key, h);
+    let c = encrypt(msg, pub_key);
+    let (aa, bb) = decrypt(c, pri_key, n, h);
 
     println!("Original A Bits : {:?}", a.all_set_bits());
     println!("Decrypted A Bits: {:?}", aa.all_set_bits());

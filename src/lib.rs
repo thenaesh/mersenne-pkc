@@ -14,6 +14,14 @@ pub type PrivateKey = (BitField, BitField);
 pub type PlainText = (BitField, BitField);
 pub type CipherText = BitField;
 
+pub fn get_threshold_for_parameters(n: usize, h: usize) -> i64 {
+    match (n, h) {
+        (44497, 64) => 50,
+        (86243, 128) => 70,
+        _ => panic!("Parameters n = {}, h = {} Unexpected!", n, h)
+    }
+}
+
 pub fn extract_session_key((a, b): &PlainText) -> String {
     let input_str = a.to_string() + &b.to_string();
     let mut hasher = Sha3::sha3_256();
@@ -28,7 +36,7 @@ pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
     (a, b)
 }
 
-pub fn encrypt(m: PlainText, pub_key: PublicKey, h: usize) -> CipherText {
+pub fn encrypt(m: PlainText, pub_key: PublicKey) -> CipherText {
     let (a, b) = m;
     let mut c = pub_key;
     c *= &a;
@@ -38,9 +46,10 @@ pub fn encrypt(m: PlainText, pub_key: PublicKey, h: usize) -> CipherText {
 }
 
 // currently does 2 passes
-pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
+pub fn decrypt(c: CipherText, pri_key: PrivateKey, n: usize, h: usize) -> PlainText {
     let start_time = SystemTime::now();
     let n = c.len();
+    let threshold = get_threshold_for_parameters(n, h);
 
     let (mut f, mut g) = pri_key;
     f.make_sparse();
@@ -52,8 +61,28 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     let mut a = BitField::new_dense(n);
     let mut b = BitField::new_dense(n);
 
-    let potential_a_bits = get_possible_coefficient_bits(&cg, &f, 70);
-    let potential_b_bits = get_possible_coefficient_bits(&cg, &g, 70);
+    for _ in 0..2 {
+        let potential_a_bits = get_possible_coefficient_bits(&cg, &f, threshold);
+        let potential_b_bits = get_possible_coefficient_bits(&cg, &g, threshold);
+
+        for idx in potential_a_bits {
+            a.set(idx)
+        }
+        for idx in potential_b_bits {
+            b.set(idx)
+        }
+
+        let mut tmp_af = a.clone();
+        let mut tmp_bg = b.clone();
+        tmp_af *= &f;
+        tmp_bg *= &g;
+        cg -= &tmp_af;
+        cg -= &tmp_bg;
+    }
+
+    /*
+    let potential_a_bits = get_possible_coefficient_bits(&cg, &f, threshold);
+    let potential_b_bits = get_possible_coefficient_bits(&cg, &g, threshold);
 
     for idx in potential_a_bits {
         a.set(idx)
@@ -69,8 +98,8 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     cg -= &tmp_af;
     cg -= &tmp_bg;
 
-    let potential_a_bits = get_possible_coefficient_bits(&cg, &f, 70);
-    let potential_b_bits = get_possible_coefficient_bits(&cg, &g, 70);
+    let potential_a_bits = get_possible_coefficient_bits(&cg, &f, threshold);
+    let potential_b_bits = get_possible_coefficient_bits(&cg, &g, threshold);
 
     for idx in potential_a_bits {
         a.set(idx)
@@ -78,6 +107,7 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     for idx in potential_b_bits {
         b.set(idx)
     }
+    */
 
     println!("Decryption Time: {}ms", start_time.elapsed().unwrap().as_millis());
     (a, b)
