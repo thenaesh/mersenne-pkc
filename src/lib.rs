@@ -1,11 +1,10 @@
 pub mod finite_ring;
 pub mod bit_field;
 
-use std::iter::Iterator;
-
 extern crate crypto;
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
+use std::time::SystemTime;
 
 use crate::bit_field::BitField;
 
@@ -34,11 +33,13 @@ pub fn encrypt(m: PlainText, pub_key: PublicKey, h: usize) -> CipherText {
     let mut c = pub_key;
     c *= &a;
     c += &b;
+
     c
 }
 
 // currently does 2 passes
 pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
+    let start_time = SystemTime::now();
     let n = c.len();
 
     let (mut f, mut g) = pri_key;
@@ -48,17 +49,17 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     let mut cg = c.clone();
     cg *= &g;
 
-    let potential_a_bits = get_hamming_weight_changes_on_subtraction(&cg, &f);
-    let potential_b_bits = get_hamming_weight_changes_on_subtraction(&cg, &g);
-
     let mut a = BitField::new_dense(n);
     let mut b = BitField::new_dense(n);
 
-    for idx in 0..h/2 {
-        let (i, _) = potential_a_bits[idx];
-        let (j, _) = potential_b_bits[idx];
-        a.set(i);
-        b.set(j);
+    let potential_a_bits = get_possible_coefficient_bits(&cg, &f, 70);
+    let potential_b_bits = get_possible_coefficient_bits(&cg, &g, 70);
+
+    for idx in potential_a_bits {
+        a.set(idx)
+    }
+    for idx in potential_b_bits {
+        b.set(idx)
     }
 
     let mut tmp_af = a.clone();
@@ -68,21 +69,23 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, h: usize) -> PlainText {
     cg -= &tmp_af;
     cg -= &tmp_bg;
 
-    let potential_a_bits = get_hamming_weight_changes_on_subtraction(&cg, &f);
-    let potential_b_bits = get_hamming_weight_changes_on_subtraction(&cg, &g);
+    let potential_a_bits = get_possible_coefficient_bits(&cg, &f, 70);
+    let potential_b_bits = get_possible_coefficient_bits(&cg, &g, 70);
 
-    for idx in 0..h/2 {
-        let (i, _) = potential_a_bits[idx];
-        let (j, _) = potential_b_bits[idx];
-        a.set(i);
-        b.set(j);
+    for idx in potential_a_bits {
+        a.set(idx)
+    }
+    for idx in potential_b_bits {
+        b.set(idx)
     }
 
+    println!("Decryption Time: {}ms", start_time.elapsed().unwrap().as_millis());
     (a, b)
 }
 
 pub fn get_possible_coefficient_bits(minuend: &BitField, subtrahend: &BitField, threshold: i64) -> Vec<usize> {
     let mut result = Vec::new();
+    let start_time = SystemTime::now();
 
     let n = minuend.len();
     let mut minuend = minuend.clone();
@@ -102,27 +105,6 @@ pub fn get_possible_coefficient_bits(minuend: &BitField, subtrahend: &BitField, 
         }
     }
 
-    result
-}
-
-pub fn get_hamming_weight_changes_on_subtraction(minuend: &BitField, subtrahend: &BitField) -> Vec<(usize, i64)> {
-    let n = minuend.len();
-
-    let mut minuend = minuend.clone();
-    minuend.extend_self(1);
-    minuend.make_sparse();
-    minuend.set(n);
-    minuend.normalize();
-
-    let mut result: Vec<(usize, i64)> = (0..n).map(|i| {
-        let mut subtrahend = subtrahend.clone();
-        subtrahend <<= i;
-        subtrahend.normalize();
-        subtrahend.extend_self(1);
-        let hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
-        (i, hamming_weight_change)
-    }).collect();
-    result.sort_unstable_by_key(|(i, hwc)| -hwc);
-
+    println!("Partial Decryption Time: {}ms", start_time.elapsed().unwrap().as_millis());
     result
 }
