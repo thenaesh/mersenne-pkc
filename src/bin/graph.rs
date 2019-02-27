@@ -21,23 +21,30 @@ fn main() {
     let start_time = SystemTime::now();
 
     println!("n = {}, h = {}", N, H);
-    let (ex_mean, ex_var, unex_max_mean, unex_max_var, ex_min_mean, ex_min_var, ex_max_mean, ex_max_var) = generate_and_plot_frequencies(N, H);
-    println!("Expected Points: mean = {}, stddev = {}", ex_mean, ex_var.sqrt());
-    println!("Unexpected Max Points: mean = {}, stddev = {}", unex_max_mean, unex_max_var.sqrt());
-    println!("Expected Min Points: mean = {}, stddev = {}", ex_min_mean, ex_min_var.sqrt());
-    println!("Expected Max Points: mean = {}, stddev = {}", ex_max_mean, ex_max_var.sqrt());
+    generate_and_plot_frequencies(N, H);
 
     println!("Elapsed Time: {}s", start_time.elapsed().unwrap().as_secs());
 }
 
-fn generate_and_plot_frequencies(n: usize, h: usize) -> (f64, f64, f64, f64, f64, f64, f64, f64) {
+fn generate_and_plot_frequencies(n: usize, h: usize) {
     let mut expected_frequency_map = HashMap::<i64, usize>::new();
     let mut unexpected_max_frequency_map = HashMap::<i64, usize>::new();
     let mut expected_min_frequency_map = HashMap::<i64, usize>::new();
     let mut expected_max_frequency_map = HashMap::<i64, usize>::new();
 
-    for i in 0..1000 {
-        let (xs, y, w, z) = generate_reductions(n, h);
+    let mut expected_frequency_map_after = HashMap::<i64, usize>::new();
+    let mut unexpected_max_frequency_map_after = HashMap::<i64, usize>::new();
+    let mut expected_min_frequency_map_after = HashMap::<i64, usize>::new();
+    let mut expected_max_frequency_map_after = HashMap::<i64, usize>::new();
+
+    let threshold = get_threshold_for_parameters(n, h);
+
+    for i in 0..100 {
+        let (pub_key, (f, g), (a, b), c) = initialize(n, h);
+
+        let mut cg = c.clone();
+        cg *= &g;
+        let (deltas, xs, y, w, z) = generate_reductions(n, &f, &a, &cg);
 
         unexpected_max_frequency_map.insert(y, match unexpected_max_frequency_map.get(&y) {
             Some(a) => a + 1,
@@ -61,76 +68,100 @@ fn generate_and_plot_frequencies(n: usize, h: usize) -> (f64, f64, f64, f64, f64
             });
         }
 
+        let mut partial_a = BitField::new_dense(n);
+        for (idx, hwc) in deltas.iter() {
+            if *hwc >= threshold {
+                partial_a.set(*idx);
+            }
+        }
+
+        let mut a = a.clone();
+        a -= &partial_a;
+
+        let mut subtrahend = partial_a.clone();
+        subtrahend *= &f;
+        let mut cg = c.clone();
+        cg *= &g;
+        cg -= &subtrahend;
+
+        let (deltas, xs, y, w, z) = generate_reductions(n, &f, &a, &cg);
+
+        unexpected_max_frequency_map_after.insert(y, match unexpected_max_frequency_map_after.get(&y) {
+            Some(a) => a + 1,
+            None => 1,
+        });
+
+        expected_min_frequency_map_after.insert(w, match expected_min_frequency_map_after.get(&z) {
+            Some(a) => a + 1,
+            None => 1,
+        });
+
+        expected_max_frequency_map_after.insert(z, match expected_max_frequency_map_after.get(&z) {
+            Some(a) => a + 1,
+            None => 1,
+        });
+
+        for x in xs {
+            expected_frequency_map_after.insert(x, match expected_frequency_map_after.get(&x) {
+                Some(b) => b + 1,
+                None => 1,
+            });
+        }
+
         print!("\r                                                \rIterations: {}", i + 1);
         std::io::stdout().flush().ok().expect("Error flushing stdout!");
     }
     println!("");
+
+    // First Run
 
     let expected_points: Vec<(f64, f64)> = expected_frequency_map.iter().map(|(hw, freq)| (*hw as f64, *freq as f64)).collect();
     let unexpected_max_points: Vec<(f64, f64)> = unexpected_max_frequency_map.iter().map(|(hw, freq)| (*hw as f64, *freq as f64)).collect();
     let expected_min_points: Vec<(f64, f64)> = expected_min_frequency_map.iter().map(|(hw, freq)| (*hw as f64, *freq as f64)).collect();
     let expected_max_points: Vec<(f64, f64)> = expected_max_frequency_map.iter().map(|(hw, freq)| (*hw as f64, *freq as f64)).collect();
 
-    println!("{} expected points, {} unexpected max points, {} expected min points, {} expected max points",
+    println!("First Run: {} expected points, {} unexpected max points, {} expected min points, {} expected max points",
         expected_points.iter().fold(0., |acc, (_, n)| acc + n),
         unexpected_max_points.iter().fold(0., |acc, (_, n)| acc + n),
         expected_min_points.iter().fold(0., |acc, (_, n)| acc + n),
         expected_max_points.iter().fold(0., |acc, (_, n)| acc + n));
 
-    plot_frequencies(&format!("graphs/freq_plot_{}_{}.svg", n.to_string(), h.to_string()), &expected_points, &unexpected_max_points, &expected_min_points, &expected_max_points);
+    plot_frequencies(&format!("graphs/freq_plot_{}_{}_first.svg", n.to_string(), h.to_string()), &expected_points, &unexpected_max_points, &expected_min_points, &expected_max_points);
 
-    let expected_points_sample_mean = {
-        let (sum, n) = expected_points.iter().fold((0., 0.), |(sum, n), (hw, freq)| (sum + *hw * *freq, n + *freq));
-        sum / n
-    };
-    let expected_points_sample_variance = {
-        let (var, n) = expected_points.iter().fold((0., 0.), |(sumsq, n), (hw, freq)| {
-            let delta = *hw - expected_points_sample_mean;
-            (sumsq + freq * delta * delta, n + freq)
-        });
-        var / (n - 1.)
-    };
+    let (ex_mean, ex_var) = get_mean_and_variance(expected_points);
+    let (unex_max_mean, unex_max_var) = get_mean_and_variance(unexpected_max_points);
+    let (ex_min_mean, ex_min_var) = get_mean_and_variance(expected_min_points);
+    let (ex_max_mean, ex_max_var) = get_mean_and_variance(expected_max_points);
 
-    let unexpected_max_points_sample_mean = {
-        let (sum, n) = unexpected_max_points.iter().fold((0., 0.), |(sum, n), (hw, freq)| (sum + *hw * *freq, n + *freq));
-        sum / n
-    };
-    let unexpected_max_points_sample_variance = {
-        let (var, n) = unexpected_max_points.iter().fold((0., 0.), |(sumsq, n), (hw, freq)| {
-            let delta = *hw - unexpected_max_points_sample_mean;
-            (sumsq + freq * delta * delta, n + freq)
-        });
-        var / (n - 1.)
-    };
+    println!("Expected Points: mean = {}, stddev = {}", ex_mean, ex_var.sqrt());
+    println!("Unexpected Max Points: mean = {}, stddev = {}", unex_max_mean, unex_max_var.sqrt());
+    println!("Expected Min Points: mean = {}, stddev = {}", ex_min_mean, ex_min_var.sqrt());
+    println!("Expected Max Points: mean = {}, stddev = {}", ex_max_mean, ex_max_var.sqrt());
 
-    let expected_min_points_sample_mean = {
-        let (sum, n) = expected_min_points.iter().fold((0., 0.), |(sum, n), (hw, freq)| (sum + *hw * *freq, n + *freq));
-        sum / n
-    };
-    let expected_min_points_sample_variance = {
-        let (var, n) = expected_min_points.iter().fold((0., 0.), |(sumsq, n), (hw, freq)| {
-            let delta = *hw - expected_min_points_sample_mean;
-            (sumsq + freq * delta * delta, n + freq)
-        });
-        var / (n - 1.)
-    };
+    // Second Run
 
-    let expected_max_points_sample_mean = {
-        let (sum, n) = expected_max_points.iter().fold((0., 0.), |(sum, n), (hw, freq)| (sum + *hw * *freq, n + *freq));
-        sum / n
-    };
-    let expected_max_points_sample_variance = {
-        let (var, n) = expected_max_points.iter().fold((0., 0.), |(sumsq, n), (hw, freq)| {
-            let delta = *hw - expected_max_points_sample_mean;
-            (sumsq + freq * delta * delta, n + freq)
-        });
-        var / (n - 1.)
-    };
+    let expected_points: Vec<(f64, f64)> = expected_frequency_map_after.iter().map(|(hw, freq)| (*hw as f64, *freq as f64)).collect();
+    let unexpected_max_points: Vec<(f64, f64)> = unexpected_max_frequency_map_after.iter().map(|(hw, freq)| (*hw as f64, *freq as f64)).collect();
+    let expected_min_points: Vec<(f64, f64)> = expected_min_frequency_map_after.iter().map(|(hw, freq)| (*hw as f64, *freq as f64)).collect();
+    let expected_max_points: Vec<(f64, f64)> = expected_max_frequency_map_after.iter().map(|(hw, freq)| (*hw as f64, *freq as f64)).collect();
 
-    (expected_points_sample_mean, expected_points_sample_variance,
-        unexpected_max_points_sample_mean, unexpected_max_points_sample_variance,
-        expected_min_points_sample_mean, expected_min_points_sample_variance,
-        expected_max_points_sample_mean, expected_max_points_sample_variance)
+    println!("Second Run: {} expected points, {} unexpected max points, {} expected min points, {} expected max points",
+        expected_points.iter().fold(0., |acc, (_, n)| acc + n),
+        unexpected_max_points.iter().fold(0., |acc, (_, n)| acc + n),
+        expected_min_points.iter().fold(0., |acc, (_, n)| acc + n),
+        expected_max_points.iter().fold(0., |acc, (_, n)| acc + n));
+
+    plot_frequencies(&format!("graphs/freq_plot_{}_{}_second.svg", n.to_string(), h.to_string()), &expected_points, &unexpected_max_points, &expected_min_points, &expected_max_points);
+
+    let (ex_mean, ex_var) = get_mean_and_variance(expected_points);
+    let (unex_max_mean, unex_max_var) = get_mean_and_variance(unexpected_max_points);
+    let (ex_min_mean, ex_min_var) = get_mean_and_variance(expected_min_points);
+    let (ex_max_mean, ex_max_var) = get_mean_and_variance(expected_max_points);
+
+    println!("Expected Points: mean = {}, stddev = {}", ex_mean, ex_var.sqrt());
+    println!("Unexpected Max Points: mean = {}, stddev = {}", unex_max_mean, unex_max_var.sqrt());
+    println!("Expected Min Points: mean = {}, stddev = {}", ex_min_mean, ex_min_var.sqrt());
+    println!("Expected Max Points: mean = {}, stddev = {}", ex_max_mean, ex_max_var.sqrt());
 }
 
 fn plot_frequencies(output_filename: &str, expected_points: &Vec<(f64, f64)>, unexpected_max_points: &Vec<(f64, f64)>, expected_min_points: &Vec<(f64, f64)>, expected_max_points: &Vec<(f64, f64)>) {
@@ -252,24 +283,27 @@ fn plot_points(output_filename: &str, n: usize, deltas: Vec<(usize, i64)>, expec
 }
 */
 
-fn generate_reductions(n: usize, h: usize) -> (Vec<i64>, i64, i64, i64) {
+fn initialize(n: usize, h: usize) -> (PublicKey, PrivateKey, PlainText, CipherText) {
     let (f, g) = randomly_generate_message(n, h);
 
     let mut pub_key = f.clone();
     pub_key /= &g;
 
     let msg = randomly_generate_message(n, h);
-    let (a,b) = msg.clone();
 
-    let mut c = encrypt(msg, pub_key);
-    c *= &g;
+    let c = encrypt(msg.clone(), pub_key.clone());
 
-    let mut c = c.extend(1);
-    c.make_sparse();
-    c.set(n);
+    (pub_key, (f, g), msg, c)
+}
+
+fn generate_reductions(n: usize, f: &BitField, a: &BitField, cg: &BitField) -> (Vec<(usize, i64)>, Vec<i64>, i64, i64, i64) {
+    let mut cg = cg.clone();
+    cg.extend_self(1);
+    cg.make_sparse();
+    cg.set(n);
 
     // we just care about the values of a, since the results will be similar for b
-    let deltas: Vec<(usize, i64)> = (0..n).map(|i| (i, delta_efficient(&c, &f, i))).collect();
+    let deltas: Vec<(usize, i64)> = (0..n).map(|i| (i, delta_efficient(&cg, &f, i))).collect();
     let expected_bits = a.all_set_bits_hashset();
 
     let expected_point_hamming_weight_reductions: Vec<i64> = deltas.iter()
@@ -289,7 +323,7 @@ fn generate_reductions(n: usize, h: usize) -> (Vec<i64>, i64, i64, i64) {
         .filter(|(i, x)| expected_bits.contains(i))
         .fold(i64::MIN, |acc, (_, x)| acc.max(*x));
 
-    (expected_point_hamming_weight_reductions, unexpected_points_max_hamming_weight_reduction, expected_points_min_hamming_weight_reduction, expected_points_max_hamming_weight_reduction)
+    (deltas, expected_point_hamming_weight_reductions, unexpected_points_max_hamming_weight_reduction, expected_points_min_hamming_weight_reduction, expected_points_max_hamming_weight_reduction)
 }
 
 fn delta(minuend: &BitField, subtrahend: &BitField, shift_amt: usize) -> i64 {
@@ -310,6 +344,23 @@ fn delta_efficient(minuend: &BitField, subtrahend: &BitField, shift_amt: usize) 
     let mut subtrahend = subtrahend.clone();
     subtrahend <<= shift_amt;
     subtrahend.normalize();
-    let subtrahend = subtrahend.extend(1);
+    subtrahend.extend_self(1);
     minuend.hamming_weight_change_upon_subtraction(subtrahend)
+}
+
+fn get_mean_and_variance(data: Vec<(f64, f64)>) -> (f64, f64) {
+    let mean = {
+        let (sum, n) = data.iter().fold((0., 0.), |(sum, n), (hw, freq)| (sum + *hw * *freq, n + *freq));
+        sum / n
+    };
+
+    let variance = {
+        let (var, n) = data.iter().fold((0., 0.), |(sumsq, n), (hw, freq)| {
+            let delta = *hw - mean;
+            (sumsq + freq * delta * delta, n + freq)
+        });
+        var / (n - 1.)
+    };
+
+    (mean, variance)
 }
