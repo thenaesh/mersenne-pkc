@@ -1,6 +1,9 @@
 pub mod finite_ring;
 pub mod bit_field;
 
+use std::thread;
+use crossbeam_channel::bounded;
+
 extern crate crypto;
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
@@ -23,10 +26,50 @@ pub fn get_threshold_for_parameters(n: usize, h: usize) -> i64 {
 }
 
 pub fn extract_session_key((a, b): &PlainText) -> String {
-    let input_str = a.to_string() + &b.to_string();
-    let mut hasher = Sha3::sha3_256();
-    hasher.input_str(&input_str);
-    hasher.result_str()
+    let a = a.as_sparse();
+    let b = b.as_sparse();
+
+    let (n, a_bits, _) = a.unwrap_sparse();
+    let (m, b_bits, _) = b.unwrap_sparse();
+
+    if n != m {
+        panic!("Unexpectedly encountered bitstrings of different length!");
+    }
+
+    let mut a_deltas: Vec<usize> = Vec::with_capacity(a_bits.len());
+    let mut b_deltas: Vec<usize> = Vec::with_capacity(b_bits.len());
+
+    for i in 1..a_bits.len() {
+        a_deltas.push(a_bits[i] - a_bits[i-1]);
+    }
+    for i in 1..b_bits.len() {
+        b_deltas.push(b_bits[i] - b_bits[i-1]);
+    }
+
+    let a_final = a_deltas.iter()
+        .fold(String::new(), |acc, x| acc + &format!("{:b}", *x))
+        .as_bytes()
+        .chunks(64)
+        .map(std::str::from_utf8)
+        .collect::<Result<Vec<&str>, _>>()
+        .unwrap().iter()
+        .map(|s| u64::from_str_radix(*s, 2).unwrap())
+        .collect::<Vec<u64>>();
+    let b_final = b_deltas.iter()
+        .fold(String::new(), |acc, x| acc + &format!("{:b}", *x))
+        .as_bytes()
+        .chunks(64)
+        .map(std::str::from_utf8)
+        .collect::<Result<Vec<&str>, _>>()
+        .unwrap().iter()
+        .map(|s| u64::from_str_radix(*s, 2).unwrap())
+        .collect::<Vec<u64>>();
+
+    let innerpdt = a_final.iter().zip(b_final.iter())
+        .map(|(a, b)| a + b)
+        .fold(0 as u64, |acc, x| acc + x);
+
+    format!("{:x}", innerpdt)
 }
 
 pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
@@ -80,41 +123,11 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, n: usize, h: usize) -> PlainT
         cg -= &tmp_bg;
     }
 
-    /*
-    let potential_a_bits = get_possible_coefficient_bits(&cg, &f, threshold);
-    let potential_b_bits = get_possible_coefficient_bits(&cg, &g, threshold);
-
-    for idx in potential_a_bits {
-        a.set(idx)
-    }
-    for idx in potential_b_bits {
-        b.set(idx)
-    }
-
-    let mut tmp_af = a.clone();
-    let mut tmp_bg = b.clone();
-    tmp_af *= &f;
-    tmp_bg *= &g;
-    cg -= &tmp_af;
-    cg -= &tmp_bg;
-
-    let potential_a_bits = get_possible_coefficient_bits(&cg, &f, threshold);
-    let potential_b_bits = get_possible_coefficient_bits(&cg, &g, threshold);
-
-    for idx in potential_a_bits {
-        a.set(idx)
-    }
-    for idx in potential_b_bits {
-        b.set(idx)
-    }
-    */
-
     println!("Decryption Time: {}ms", start_time.elapsed().unwrap().as_millis());
     (a, b)
 }
 
 pub fn get_possible_coefficient_bits(minuend: &BitField, subtrahend: &BitField, threshold: i64) -> Vec<usize> {
-    let mut result = Vec::new();
     let start_time = SystemTime::now();
 
     let n = minuend.len();
@@ -124,16 +137,36 @@ pub fn get_possible_coefficient_bits(minuend: &BitField, subtrahend: &BitField, 
     minuend.set(n);
     minuend.normalize();
 
-    for i in 0..n {
-        let mut subtrahend = subtrahend.clone();
-        subtrahend <<= i;
-        subtrahend.normalize();
-        subtrahend.extend_self(1);
-        let hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
-        if hamming_weight_change >= threshold {
-            result.push(i)
-        }
+    const NUM_THREADS: usize = 8;
+    let job_size = n / NUM_THREADS + 1;
+    let (s, r) = bounded(n);
+
+    for thread_idx in 0..NUM_THREADS {
+        let subtrahend = subtrahend.clone();
+        let minuend = minuend.clone();
+        let s = s.clone();
+
+        thread::spawn(move || {
+            let start_idx = thread_idx * job_size;
+            let end_idx = std::cmp::min(n, start_idx + job_size);
+
+            for i in start_idx..end_idx {
+                let mut subtrahend = subtrahend.clone();
+                subtrahend <<= i;
+                subtrahend.normalize();
+                subtrahend.extend_self(1);
+                let hamming_weight_change = minuend.hamming_weight_change_upon_subtraction(subtrahend);
+                if hamming_weight_change >= threshold {
+                    s.send(i).unwrap();
+                }
+            }
+
+            drop(s);
+        });
     }
+
+    drop(s);
+    let result: Vec<usize> = r.iter().collect();
 
     println!("Partial Decryption Time: {}ms", start_time.elapsed().unwrap().as_millis());
     result
