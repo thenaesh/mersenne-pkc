@@ -37,7 +37,7 @@ fn generate_and_plot_frequencies(n: usize, h: usize) {
     let mut expected_min_frequency_map_after = HashMap::<i64, usize>::new();
     let mut expected_max_frequency_map_after = HashMap::<i64, usize>::new();
 
-    let threshold = get_threshold_for_parameters(n, h);
+    let threshold = get_threshold_for_parameters(n, h, 0);
 
     for i in 0..100 {
         let (pub_key, (f, g), (a, b), c) = initialize(n, h);

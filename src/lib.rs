@@ -5,8 +5,6 @@ use std::thread;
 use crossbeam_channel::bounded;
 
 extern crate crypto;
-use crypto::digest::Digest;
-use crypto::sha3::Sha3;
 use std::time::SystemTime;
 
 use crate::bit_field::BitField;
@@ -17,11 +15,13 @@ pub type PrivateKey = (BitField, BitField);
 pub type PlainText = (BitField, BitField);
 pub type CipherText = BitField;
 
-pub fn get_threshold_for_parameters(n: usize, h: usize) -> i64 {
-    match (n, h) {
-        (44497, 64) => 50,
-        (86243, 128) => 70,
-        _ => panic!("Parameters n = {}, h = {} Unexpected!", n, h)
+pub fn get_threshold_for_parameters(n: usize, h: usize, n_iter: usize) -> i64 {
+    match (n, h, n_iter) {
+        (44497, 64, 0) => 50, // used only for plotting graphs
+        (86243, 128, 0) => 74,
+        (86243, 128, 1) => 60,
+        (86243, 128, _) => 60,
+        _ => panic!("Parameters n = {}, h = {}, n_iter = {} Unexpected!", n, h, n_iter)
     }
 }
 
@@ -49,25 +49,25 @@ pub fn extract_session_key((a, b): &PlainText) -> String {
     let a_final = a_deltas.iter()
         .fold(String::new(), |acc, x| acc + &format!("{:b}", *x))
         .as_bytes()
-        .chunks(64)
+        .chunks(128)
         .map(std::str::from_utf8)
         .collect::<Result<Vec<&str>, _>>()
         .unwrap().iter()
-        .map(|s| u64::from_str_radix(*s, 2).unwrap())
-        .collect::<Vec<u64>>();
+        .map(|s| u128::from_str_radix(*s, 2).unwrap())
+        .collect::<Vec<u128>>();
     let b_final = b_deltas.iter()
         .fold(String::new(), |acc, x| acc + &format!("{:b}", *x))
         .as_bytes()
-        .chunks(64)
+        .chunks(128)
         .map(std::str::from_utf8)
         .collect::<Result<Vec<&str>, _>>()
         .unwrap().iter()
-        .map(|s| u64::from_str_radix(*s, 2).unwrap())
-        .collect::<Vec<u64>>();
+        .map(|s| u128::from_str_radix(*s, 2).unwrap())
+        .collect::<Vec<u128>>();
 
     let innerpdt = a_final.iter().zip(b_final.iter())
         .map(|(a, b)| a + b)
-        .fold(0 as u64, |acc, x| acc + x);
+        .fold(0 as u128, |acc, x| acc + x);
 
     format!("{:x}", innerpdt)
 }
@@ -88,11 +88,9 @@ pub fn encrypt(m: PlainText, pub_key: PublicKey) -> CipherText {
     c
 }
 
-// currently does 2 passes
 pub fn decrypt(c: CipherText, pri_key: PrivateKey, n: usize, h: usize) -> PlainText {
     let start_time = SystemTime::now();
     let n = c.len();
-    let threshold = get_threshold_for_parameters(n, h);
 
     let (mut f, mut g) = pri_key;
     f.make_sparse();
@@ -104,9 +102,19 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, n: usize, h: usize) -> PlainT
     let mut a = BitField::new_dense(n);
     let mut b = BitField::new_dense(n);
 
-    for _ in 0..2 {
+    let mut num_a_bits_left = h;
+    let mut num_b_bits_left = h;
+
+    for iter in 0.. {
+        let threshold = get_threshold_for_parameters(n, h, iter);
+
         let potential_a_bits = get_possible_coefficient_bits(&cg, &f, threshold);
         let potential_b_bits = get_possible_coefficient_bits(&cg, &g, threshold);
+
+        let num_a_bits_obtained = potential_a_bits.len();
+        let num_b_bits_obtained = potential_b_bits.len();
+        num_a_bits_left = std::cmp::max(0, num_a_bits_left - num_a_bits_obtained);
+        num_b_bits_left = std::cmp::max(0, num_b_bits_left - num_b_bits_obtained);
 
         for idx in potential_a_bits {
             a.set(idx)
@@ -121,6 +129,13 @@ pub fn decrypt(c: CipherText, pri_key: PrivateKey, n: usize, h: usize) -> PlainT
         tmp_bg *= &g;
         cg -= &tmp_af;
         cg -= &tmp_bg;
+
+        if num_a_bits_left == 0 && num_b_bits_left == 0 {
+            break;
+        }
+        if num_a_bits_obtained == 0 && num_b_bits_obtained == 0 {
+            break;
+        }
     }
 
     println!("Decryption Time: {}ms", start_time.elapsed().unwrap().as_millis());
