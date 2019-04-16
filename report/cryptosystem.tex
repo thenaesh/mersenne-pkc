@@ -1,0 +1,244 @@
+\section{Overview}
+\paragraph{}
+Before we give a formal specification of MersennePKC, we first give an illustration of how it is expected to work intuitively.
+
+\paragraph{}
+Let $n, h \in \N$ such that $n > 2h^2$ and $2^n - 1$ is a Mersenne prime. Suppose we have an extractor $Ext: \ham_h^n \times \ham_h^n \rightarrow \F_2^\lambda$, for some $\lambda \in \N$.
+
+\paragraph{}
+We assume that we have two agents Alice and Bob. Suppose Bob has private key $(F, G) \in \ham_h^n \times \ham_h^n$ and public key $H = \frac{F}{G} \in \mathcal{B}_n$. Then an Alice can send a message $m \in \F_2^\lambda$ to Bob via the following protocol:
+
+\begin{tikzpicture}
+\node[] at (2, 50) {\underline{\textbf{Alice}}};
+\node[] at (8, 50) {\underline{\textbf{Bob}}};
+\node[](1) at (2, 49) {$A, B \sim \mathcal{U}(\ham_h^n)$};
+\node[](2) at (2, 48) {$C := A H + B$};
+\node[](3) at (2, 47) {$c := Ext(A, B) \oplus m$};
+\node[](4) at (2, 46) {send $(C, c)$ to Bob};
+\node[](5) at (8, 46) {receive $(C, c)$ from Alice};
+\draw[->] (4) -- (5);
+\node[](6) at (8, 45) {$D := CG$};
+\node[](7) at (8, 44) {$(A,B) := \chi_{n, h}(D, F, G)$};
+\node[](8) at (8, 43) {$m := Ext(A, B) \oplus c$};
+\draw (-1, 42) rectangle (11, 51);
+\end{tikzpicture}
+
+\paragraph{}
+In the protocol above, Alice first uniformly and randomly samples $A$ and $B$ from $\ham_h^n$. She then sends the pair $(C, c) = (AH + B, Ext(A, B) \oplus m)$ over an insecure channel to Bob, where $H$ is Bob's public key.
+
+\paragraph{}
+Bob receives $(C, c)$ from Alice and computes $D = CG$ using the $G$ component of his private key. He then uses the message extraction algorithm described in Chapter \ref{correctness_chapter} to recover $A$ and $B$ from $D$. He finally computes $Ext(A,B) \oplus c = Ext(A, B) \oplus Ext(A, B) \oplus m = m$, thereby retrieving the plaintext.
+
+\paragraph{}
+Having illustrated the functioning of MersennePKC, we proceed to its formal specification.
+
+\section{Specification}
+\theoremstyle{definition}
+\begin{definition}{\textbf{MersennePKC}}\label{mersennepkc-specification}
+Let $n, h \in \N$ be fixed parameters such that $n \geq 2h^2$ and $p = 2^n -1$ is a Mersenne prime. Let $Ext: \ham_h^n \times \ham_h^n \rightarrow \F_2^\lambda$ be an extractor. MersennePKC-($n, h, Ext$) is the tuple $(\mathcal{P}, \mathcal{C}, \mathcal{K}, \mathcal{E}, \mathcal{D})$ where:
+\begin{align*}
+    \mathcal{P} =\:&\F_2^\lambda\\
+    \mathcal{C} =\:&\mathcal{B}_n \times \F_2^\lambda\\
+    \mathcal{K} =\:&\{ (F, G, H) \in \ham_h^n \times \ham_h^n \times \mathcal{B}_n : H = \frac{F}{G} \}\\
+    \mathcal{E} =\:&\{e_k: \ham_h^n \times \ham_h^n \times \mathcal{P} \rightarrow \mathcal{C} :\\
+    &\:k = (F, G, H) \in \mathcal{K},\\
+    &\:e_k(A, B, m) = (AH + B, Ext(A, B) \oplus m) \}\\
+    \mathcal{D} =\:&\{ d_k: \mathcal{C} \rightarrow \mathcal{P} :\\
+    &\:k = (F, G, H) \in \mathcal{K},\\
+    &\:d_k(C, c) = Ext(\chi_{n, h}(CG, F, G)) \oplus c \}
+\end{align*}
+\end{definition}
+
+\paragraph{}
+In the definition above, the cryptosystem explicitly depends on the choices of $n$, $h$ and the extractor $Ext$, and also implicitly depends on $\lambda$ via $Ext$.
+\begin{itemize}
+    \item $\mathcal{P}$ is the set of plaintexts.
+    \item $\mathcal{C}$ is the set of ciphertexts.
+    \item $\mathcal{K}$ is the set of keys. Each key has the form $(F, G, H)$, where $(F, G)$ is the private key while $H$ is the public key.
+    \item $\mathcal{E}$ is the set of encryption functions. Each encryption function $e_k$ depends on a key $k$, and is of the form $\ham_h^n \times \ham_h^n \times \mathcal{P} \rightarrow \mathcal{C}$. The extra input from $\ham_h^n \times \ham_h^n$ in addition to the plaintext is meant for the encryptor to supply uniform random choices to allow for semantic security.
+    \item $\mathcal{D}$ is the set of decryption functions. Each decryption function $d_k$ depends on a key $k$, and uses $\chi_{h_h}$ from Chapter \ref{correctness_chapter} as part of its decryption.
+\end{itemize}
+
+\section{Security}
+
+\paragraph{}
+We can see from the illustration of MersennePKC that any adversary intercepting the insecure communications channel between Alice and Bob is able to obtain the following information:
+\begin{itemize}
+    \item cryptosystem parameters $n, h$, known publicly
+    \item Bob's public key, $H$, known publicly
+    \item ciphertext $(C, c)$ that Alice sends to Bob over the channel during the key exchange
+\end{itemize}
+
+\paragraph{}
+We want to see how secure MersennePKC is under chosen plaintext attacks (IND-CPA) and chosen ciphertext attacks (IND-CCA).
+
+\paragraph{}
+For the rest of this section, we assume that $(\mathcal{P}, \mathcal{C}, \mathcal{K}, \mathcal{E}, \mathcal{D})$ is a MersennePKC-($n, h, Ext$) instance, where $Ext: \ham_h^n \times \ham_h^n \rightarrow \F_2^\lambda$ is an extractor, $h$ is the security parameter and $\lambda = h$.
+
+\paragraph{}
+For each key $k = (F, G, H) \in \mathcal{K}$, we define two oracles.
+\begin{itemize}
+    \item Let $\mathcal{O}_k^\mathcal{E}$ be an encryption oracle that encrypts a plaintext $m \in \mathcal{P}$ to $(AH + B, Ext(A, B) \oplus m) \in \mathcal{C}$, where $A$ and $B$ are uniformly and randomly chosen from $\ham_h^n$.
+    \item Let $\mathcal{O}_k^\mathcal{D}$ be a decryption oracle that decrypts a ciphertext $(C, c) \in \mathcal{C}$ to $Ext(A, B) \oplus c \in \mathcal{P}$, where $C = A \frac{F}{G} + B$.
+\end{itemize}
+
+\subsection{Chosen Plaintext Attacks}
+\paragraph{}
+MersennePKC is secure under chosen plaintext attacks (IND-CPA), subject to some assumptions.
+
+\begin{assumption}\label{assumpt_pubkey_appears_uniform}
+Let $\mathcal{A}$ be a probabilistic polynomial-time Turing machine. Let $(F, G, H) \in \mathcal{K}$. Define the following probability distributions:
+\begin{align*}
+\mathcal{X} &= \mathcal{U}(\{ AH + B: A, B \in \ham_h^n  \})\\
+\mathcal{Y} &= \mathcal{U}(\mathcal{B}_n)
+\end{align*}
+The task of $\mathcal{A}$ is to output $0$ if its input comes from $\mathcal{X}$ and $1$ if its input comes from $\mathcal{Y}$. Let $X \sim \mathcal{X}$ and $Y \sim \mathcal{Y}$ be random variables. Then $Adv^\mathcal{A}(X, Y) \in O(2^{-h})$.
+\qed
+\end{assumption}
+
+\begin{assumption}\label{assumpt_extracted_value_appears_uniform}
+Let $\mathcal{A}$ be a probabilistic polynomial-time Turing machine. Define the following probability distributions:
+\begin{align*}
+\mathcal{X} &= \mathcal{U}(\{ Ext(A, B): A, B \in \ham_h^n  \})\\
+\mathcal{Y} &= \mathcal{U}(\mathcal{B}_n)
+\end{align*}
+The task of $\mathcal{A}$ is to output $0$ if its input comes from $\mathcal{X}$ and $1$ if its input comes from $\mathcal{Y}$. Let $X \sim \mathcal{X}$ and $Y \sim \mathcal{Y}$ be random variables. Then $Adv^\mathcal{A}(X, Y) \in O(2^{-h})$.
+\qed
+\end{assumption}
+
+\paragraph{}
+Assumption \ref{assumpt_pubkey_appears_uniform} claims that the public keys appear uniformly random on $\mathcal{B}_n$ and do not leak information about the private key. Assumption \ref{assumpt_extracted_value_appears_uniform} claims that $Ext(A, B)$ does not leak any information about $AH+B$ (and therefore does not leak any information about $A$ or $B$).
+
+\paragraph{}
+With these assumptions, we can now show that MersennePKC is secure under chosen plaintext attacks.
+
+\begin{theorem}{\textbf{MersennePKC satisfies IND-CPA}}
+Fix some key $k = (F, G, H) \in \mathcal{K}$. Let $\mathcal{A}$ be a probabilistic polynomial-time adversary with access to $H$ and $\mathcal{O}_k^\mathcal{E}$ who chooses $m_0, m_1 \in \mathcal{P}$. Define the following random variables:
+\begin{align*}
+Z_0 &\sim \mathcal{U}(\{ (AH + B, Ext(A, B) \oplus m_0) : A, B \in \ham_h^n \})\\
+Z_1 &\sim \mathcal{U}(\{ (AH + B, Ext(A, B) \oplus m_1) : A, B \in \ham_h^n \})\\
+\end{align*}
+Then $Adv^\mathcal{A}(Z_0, Z_1) \in O(2^{-h})$ regardless of the choice of $m_0, m_1 \in \mathcal{P}$ that $\mathcal{A}$ makes.
+\end{theorem}
+\begin{proof}
+The goal is for $\mathcal{A}$ to output $b$ given $(C, c) = (AH + B, Ext(A, B) \oplus m_b)$. There are two ways to do this: attempting to recover information about $A$ and $B$ (and hence $Ext(A, B)$ by obtaining information about the private key $F$ and $G$, or using $AH + B$ to obtain information about $Ext(A, B)$.
+\newline
+By Assumption \ref{assumpt_pubkey_appears_uniform}, the public key appears uniform and random to $\mathcal{A}$. Extracting any information about the private key from the public key allows $\mathcal{A}$ to distinguish the public key from a random bitstring sampled from $\mathcal{U}(\mathcal{B}_n)$, and so the advantage of $\mathcal{A}$ in doing so is bounded above by $O(2^{-h})$.
+\newline
+By Assumption \ref{assumpt_extracted_value_appears_uniform}, the advantage of $\mathcal{A}$ in obtaining any information about $Ext(A, B)$ from $AH + B$ is bounded above by $O(2^{-h})$.
+\newline
+Since $\mathcal{A}$ needs to only succeed at one of the two attempts to distinguish $Z_0$ from $Z_1$, the probability of distinguishing them is bounded above by the sum of the probabilities of distinguishing them using each approach. Therefore, for some $\alpha, \beta \in \N$:
+\begin{align*}
+Adv^\mathcal{A}(Z_0, Z_1) &\in O(2^{-h}) + O(2^{-h})\\
+&= O(2^{-h})
+\end{align*}
+\end{proof}
+
+\subsection{Chosen Ciphertext Attacks}
+\paragraph{}
+MersennePKC, as given above, fails to satisfy even IND-CCA1 i.e. it is vulnerable to nonadaptive chosen ciphertext attacks.
+
+\paragraph{}
+Suppose an probabilistic polynomial-time adversary with access to $\mathcal{O}_k^\mathcal{D}$ chooses $m_0, m_1 \in \mathcal{P}$, is given $(C, c) = (AH + B, Ext(A, B) \oplus m_b) \in \mathcal{C}$ by the challenger and needs to determine $b \in \{0, 1\}$. The adversary simply queries $\mathcal{O}_k^\mathcal{D}$ with the ciphertext $(AH + B, 0^\lambda)$. The oracle gives $m' = Ext(A, B) \oplus 0^\lambda = Ext(A, B)$ to the adversary, who then computes $c \oplus m' = Ext(A, B) \oplus m_b \oplus Ext(A, B) = m_b$ and compares the result with $m_0$ and $m_1$. In this way, the adversary can determine $b$, so MersennePKC as given does not satisfy IND-CCA1.
+
+\paragraph{}
+To make MersennePKC secure under chosen ciphertext attacks, we use a technique similar to that in Section 7 of \cite{aggarwal2018new}: turning the MersennePKC-($n, h, Ext$) instance into a key encapsulation mechanism and using a random oracle to transform the randomly selected key. We call this new key encapsulation mechanism MersenneKEM-($n, h, Ext$).
+
+\theoremstyle{definition}
+\begin{definition}{\textbf{MersenneKEM}}
+Suppose $\mathcal{H}_0$ and $\mathcal{H}_1$ are random oracles with input $\F_2^\lambda$ and output $\ham_h^n$.
+\begin{itemize}
+    \item Let $\overline{\mathcal{E}}$ be an algorithm that takes as input a public key $H$, samples $K \sim \mathcal{U}(\F_2^\lambda)$, computes $A = \mathcal{H}_0(K), B = \mathcal{H}_1(K)$ and outputs $(AH + B, Ext(A, B) \oplus K$.
+    \item Let $\overline{\mathcal{D}}$ be an algorithm that as input a private key $(F, G)$ and ciphertext $(C, c)$, retrieves $(A', B')$ from $CG$ using the message extraction algorithm from Chapter \ref{correctness_chapter}, computes $K' = Ext(A', B') \oplus c$, and outputs $K'$ if $A'H + B' = C$ or gives an error otherwise. 
+\end{itemize}
+MersenneKEM-($n, h, Ext$) is the tuple $(\mathcal{P}, \mathcal{C}, \mathcal{K}, \overline{\mathcal{E}}, \overline{\mathcal{D}})$.
+\end{definition}
+
+\begin{theorem}{\textbf{MersenneKEM satisfies IND-CCA}}\label{mersennekem-ind-cca}
+Fix some key $k = (F, G, H) \in \mathcal{K}$. Let $\mathcal{A}$ be a probabilistic polynomial-time adversary with access to $H$ and an oracle $\mathcal{O}_k^{\overline{\mathcal{D}}}$ to perform decapsulation. Let $X = (C, K_0) \sim \overline{\mathcal{E}}(F, G)$ and $Y = (C, K_1)$ where $K_1$ is uniformly and randomly sampled from $\mathcal{P}$. Then $Adv^\mathcal{A}(X, Y) \in O(2^{-h})$.
+\end{theorem}
+
+\paragraph{}
+The proof of Theorem \ref{mersennekem-ind-cca} is identical to that of Theorem 2 in \cite{aggarwal2018new}, although the key exchange protocols are different.
+
+\section{Extractors}
+\paragraph{}
+MersennePKC and MersenneKEM are defined with respect to an extractor function, in addition to $n$ and $h$. Since we set the security parameter $\lambda$ to $h$, we expect the extractors to have the type $Ext: \ham_h^n \times \ham_h^n \rightarrow \F_2^h$.
+
+\paragraph{}
+Since we set $h = 128$, we can generally use any cryptographic hash function that outputs a $128$-bit string as an extractor. However, in the interest of efficiency in encryption and decryption, we opt to use a simpler extractor involving the inner product. Before we take an inner product, we perform a sequence of transformations to remove any unnecessary bits not contributing to the entropy of the source strings used in the extractor.
+
+\paragraph{}
+Suppose we have $A \in \ham_h^n$, which is a bitstring that typically consists of clusters of $0$s separated by a small number of $1$s. Since $A$ has Hamming weight $h$, there are at most $h+1$ clusters. Each cluster has at most $n$ elements since the entire string $A$ has only $n$ bits. We can therefore identify the sequence of clusters with a vector in $\Z_n^{h+1}$. We define a map $f: \ham_h^n \rightarrow \Z_n^{h+1}$ to represent this identification.
+
+\paragraph{}
+We then define the map $g: \Z_n^{h+1} \rightarrow \F_2^{(h+1) \log{n}}$ in the following manner: given an input $x \in \Z_n^{h+1}$, concatenate the bit representations of all the elements in the vector without the leading one (which does not contribute to the entropy of the result) into a single bitstring $y$. Since each element of $x$ has at most $\log{n}$ bits (being an element of $\Z_n$) and $x$ has $h+1$ elements, it follows that $y \in \F_2^{(h+1) \log{n}}$.
+
+\paragraph{}
+We finally define the map $h: \F_2^{(h+1) \log{n}} \rightarrow \F_{2^h}^m$, for the appropriate choice of $m$, by regarding each element of $\F_2^{(h+1) \log{n}}$ as an element in $\F_{2^h}^m$. This $m$ will be sligtly greater than $\log{n}$, and the bitstrings in $\F_2^{(h+1) \log{n}}$ may be padded if necessary.
+
+\theoremstyle{definition}
+\begin{definition}{\textbf{Inner Product Extractor}}
+Define $Ext: \ham_h^n \times \ham_h^n \rightarrow \F_{2^h}$ in the following way:
+\begin{align*}
+    Ext(A, B) &= <h \circ g \circ f(A), h \circ g \circ f(B)>
+\end{align*}
+We then identify $\F_{2^h}$ with $\F_2^h$ by identifying elements in $\F_{2^h}$ with their bit representations, and obtain an extractor $Ext: \ham_h^n \times \ham_h^n \rightarrow \F_2^h$.
+\end{definition}
+
+\paragraph{}
+The inner product extractor appears uniform and random to an adversary without access to $A$ or $B$: this is a standard result from \cite{chor1988unbiased}. This extractor is not secure under information leakage; however, it may be transformed accordingly using methods from \cite{dziembowski2011leakage} if needed.
+
+\paragraph{}
+We note that the extractor defined here runs in $O(n)$. This is clear since none of the intermediate representations require more than $n$ bits (the most is $(h+1) \log{n}$, which is still less than $n \geq 2h^2$), and all the intermediate steps require making only a single pass over the data.
+
+\section{Algorithmic Efficiency}
+\paragraph{}
+For the key exchange protocol to be usable in practice, it is necessary that its operations are efficient. We consider the complexity of the following operations:
+\begin{itemize}
+    \item key generation
+    \item encryption
+    \item decryption
+\end{itemize}
+
+\subsection{Key Generation}
+\paragraph{}
+Key generation involves Bob randomly generating $F, G \in \ham_h^n$ and computing $\frac{F}{G}$.
+
+\paragraph{}
+Generating $F$ (and $G$) involves sampling $h$ numbers $i_1, \dots i_h$ without replacement from $\mathcal{U}(\Z_n)$ and computing $F = \sum_{k = 1}^n 2^{i_k}$ (similarly for $G$). An algorithm is given in \cite{10.1007/3-540-13883-8_89} that performs this with time complexity $O(h \log{h}) = O(\sqrt{n} \log{n}) \subseteq O(n)$.
+
+\paragraph{}
+Computing $\frac{F}{G}$ can then be done by obtaining $G^{-1} \mod{2^n - 1}$. This can be done by using the extended Euclidean algorithm to compute $\gcd(G, 2^n - 1)$, which runs in time $O(\log{2^n - 1}) = O(n)$. We then compute $F \times G^{-1}$ using an algorithm given by \cite{schonhage1971schnelle}, which has time complexity $O(n \log{n} \log{\log{n}})$. The process of computing $\frac{F}{G}$ therefore takes $O(n \log{n} \log{\log{n}})$.
+
+\paragraph{}
+Key generation can therefore be done in $O(n \log{n} \log{\log{n}})$ time.
+
+\subsection{Encryption}
+\paragraph{}
+The encryption stage involves Alice randomly generating $A, B \in \ham_h^n$ and computing $AH + B$, where $H$ is Bob's public key.
+
+\paragraph{}
+Generating $A$ and $G$ involves the same process of sampling without replacement from $\ham_h^n$ used to compute $F$ and $G$ in the key generation stage, using the algorithm given in \cite{10.1007/3-540-13883-8_89}, so we already know that this takes $O(n)$.
+
+\paragraph{}
+Computing $AH + B$ involves a multiplication step and an addition step. We use the algorithm given by \cite{schonhage1971schnelle} to compute $AH$ in $O(n \log{n} \log{\log{n}})$, and then add $B$ by the usual bitwise addition algorithm that runs in $O(n)$.
+
+\paragraph{}
+Computing $Ext(A, B)$ and $Ext(A, B) \oplus m$ takes $O(n)$.
+
+\paragraph{}
+The entire encryption stage therefore runs in $O(n \log{n} \log{\log{n}})$.
+
+\subsection{Decryption}
+\paragraph{}
+The decryption stage involves Bob computing $D = CG$, and then using the algorithm we gave in Section \ref{msg_ext_deduction} to retrieve $(A, B)$.
+
+\paragraph{}
+Computing $D = CG$ involves a multiplication, so we know this step takes $O(n \log{n} \log{\log{n}})$ using the algorithm given in \cite{schonhage1971schnelle}. Retrieving $(A, B)$ from $D$ takes $O(nh) = O(n \sqrt{n})$.
+
+\paragraph{}
+Computing $Ext(A, B)$ and $Ext(A, B) \oplus c$ takes $O(n)$.
+
+\paragraph{}
+The entire decryption step therefore takes $O(n \sqrt{n})$ time.

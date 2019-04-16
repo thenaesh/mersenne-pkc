@@ -1,0 +1,208 @@
+\section{Classical Cryptosystems}
+\paragraph{}
+As of 2019, the public-key cryptosystems most commonly used in practice are based on two problems thought to be hard on classical computers: the integer factorisation problem and the discrete logarithm problem. These problems, while thought to be hard on classical computers, are unfortunately easy to solve on quantum computers, which presents a major security challenge with the advent of quantum computers.
+
+\paragraph{}
+We begin by defining these problems and their associated cryptosystems in this section, in preparation for the generalisation and quantum attack in the following section.
+
+\subsection{Cryptosystems based on Integer Factorisation}
+\theoremstyle{definition}
+\begin{definition}{\textbf{Integer Factorisation Problem}}
+Let $n \in \N$ be a large, publicly-known constant. Given $n = pq$ where $p,q \in \Z_n$ are prime, determine $p$ and $q$.
+\end{definition}
+
+\paragraph{}
+The hardness of integer factorisation is used in the RSA public key cryptosystem, which is one commonly used cryptosystem today. The RSA cryptosystem is given by the tuple $(\mathcal{P}, \mathcal{C}, \mathcal{K}, \mathcal{E}, \mathcal{D})$, where:
+\begin{itemize}
+    \item $\mathcal{P} = \Z$ is the set of plaintexts
+    \item $\mathcal{C} = \Z$ is the set of ciphertexts
+    \item $\mathcal{K} = \{ (n, E, D, p, q) \in \Z^5 : p,q \text{ prime}, n = pq, ED \equiv 1 \pmod{(p-1)(q-1)} \}$ is the set of keys, where for each key $(n, E, D, p, q)$:
+    \begin{itemize}
+        \item $(n, E)$ is the public component
+        \item $(D, p, q)$ is the private component
+    \end{itemize}
+    \item $\mathcal{E} = \{ e_k: \mathcal{P} \rightarrow \mathcal{C} : k = (n, E, D, p, q)) \in \mathcal{K}, e_k(x) \equiv x^E \pmod{n} \}$ is the set of encryption functions
+    \item $\mathcal{D} = \{ d_k: \mathcal{C} \rightarrow \mathcal{P} : k = (n, E, D, p, q) \in \mathcal{K}, d_k(y) \equiv y^D \pmod{n} \}$ is the set of decryption functions
+\end{itemize}
+
+\subsection{Cryptosystems based on Discrete Logarithm}
+
+\theoremstyle{definition}
+\begin{definition}{\textbf{Discrete Logarithm Problem}}
+Let $(G, *)$ be a cyclic group with publicly-known generator $\mathcal{P}$. Given $\mathcal{Q} = n\mathcal{P}$ for some $n \in \N$, determine $n$.
+\end{definition}
+
+\paragraph{}
+The hardness of the discrete logarithm problem, with the group $(G, *)$ set to the multiplicative group $(\F_p, \times)$ for some large prime $p$, is used in the ElGamal cryptosystem, which is another commonly used cryptosystem. The ElGamal cryptosystem is given by:
+\begin{itemize}
+    \item $\mathcal{P} = \F_p$ is the set of plaintexts
+    \item $\mathcal{C} = \F_p^2$ is the set of ciphertexts
+    \item $\mathcal{K} = \{ (p, \theta, A, a) \in \F_n^4 : A = \theta^a \}$ is the set of keys, where for each key $(p, \theta, A, a)$:
+    \begin{itemize}
+        \item $(p, \theta, A)$ is the public component
+        \item $a$ is the private component
+    \end{itemize}
+    \item $\mathcal{E} = \{ e_k: \mathcal{P} \times \F_p \rightarrow \mathcal{C} : k = (p, \theta, A, a) \in \mathcal{K}, e_k(x, b) = (\theta^b, A^b) \}$ is the set of encryption functions, where $b \in \F_p$ is a number randomly chosen by the encryptor
+    \item $\mathcal{D} = \{ d_k: \mathcal{C} \rightarrow \mathcal{P} : k = (p, \theta, A, a) \in \mathcal{K}, d_k(B, y) = yB^{-a} \}$ is the set of decryption functions
+\end{itemize}
+
+\section{Threat Posed by Quantum Computers}
+\paragraph{}
+The hard problems presented in the previous section turn out to be instances of a more general problem which has an efficient solution on quantum computers. The result is that all classical cryptosystems based on those hard problems can be broken easily with quantum computers.
+
+\subsection{Hidden Subgroup Problem}
+\paragraph{}
+The integer factorisation problem and the discrete logarithm problem are instances of what is known as the hidden subgroup problem (HSP). They are, in fact, instances of HSP on \textit{finitely-generated Abelian groups} (Fin-Ab-HSP).
+
+\paragraph{}
+Before we can define HSP and Fin-Ab-HSP, we need to define the notion of \textit{subgroup hiding}.
+
+\theoremstyle{definition}
+\begin{definition}{\textbf{Subgroup Hiding}}
+Let $(G, *)$ be a group. Let $K$ be a subgroup of $G$ and $X$ be an arbitrary set. A function $f: G \rightarrow X$ is said to hide $H$ if:
+\begin{itemize}
+    \item $\forall a \in G \: \exists x \in X \: [ f(a*K) = \{x\}]$ is a singleton set in $X$ i.e. $f$ maps every element in the same coset of $K$ to the same value in $X$
+    \item $\forall a,b \in G \: [a*K \not= b*K \implies f(a*K) \cup f(b*K) = \emptyset]$ i.e. $f$ maps distinct cosets of $K$ to disjoint subsets of $X$
+\end{itemize}
+\end{definition}
+
+\paragraph{}
+In the definition of subgroup hiding, we consider left cosets of the subgroup, but the definition also works for right cosets. We are also ultimately interested in subgroup hiding in Abelian groups (in Fin-Ab-HSP), where there is no distinction between left and right cosets.
+
+\paragraph{}
+We can now proceed to define HSP. The definition of Fin-Ab-HSP follows from that of HSP by requiring the group $(G, *)$ to be finitely-generated and Abelian.
+
+\theoremstyle{definition}
+\begin{definition}{\textbf{HSP}}
+Let $(G, *)$ be a group. Let $K$ be a subgroup of $G$ and $X$ be an arbitrary set. Given a function $f: G \rightarrow X$ that hides $K$, output a generating set for $K$.
+\end{definition}
+
+\paragraph{}
+We now proceed to show that the integer factorisation problem and discrete logarithm problem are both instances of Fin-Ab-HSP.
+
+\subsection{Integer Factorisation as a Fin-Ab-HSP Instance}
+\paragraph{}
+We give a polynomial-time reduction from the integer factorisation problem to Fin-Ab-HSP. This requires reduction of integer factorisation to an intermediate problem: order finding.
+
+\theoremstyle{definition}
+\begin{definition}{\textbf{Order Finding Problem}}
+Let $n \in \N$ be known. Given $a \in \N$ where $a < N$ and $\gcd(a, N) = 1$, find the smallest $r \in \N$ such that $a^r \equiv 1 \mod{N}$. We call this $(a, n)$ an instance of the order finding problem with solution $r$.
+\end{definition}
+
+\begin{lemma}\label{int_fac_2_ord_find}
+There is a polynomial-time Cook reduction from the integer factorisation problem to the order finding problem.
+\end{lemma}
+
+\paragraph{}
+The proof of Lemma \ref{int_fac_2_ord_find} is given in Subsection 5.3.2 of \cite{nielsen2002quantum}. With this lemma in place, we can simply construct an instance of Fin-Ab-HSP for order finding. We use a construction taken from Figure 5.5 of \cite{nielsen2002quantum}, which is a table that describes how to represent various problems as instances of HSP.
+
+\begin{lemma}\label{hsp_for_ord_find}
+Suppose $(a, n) \in \N^2$ is an instance of the order finding problem with solution $r$.
+Define the following sets:
+\begin{align*}
+    G &= \Z\\
+    K &= r\Z\\
+    X &= \{a^j : j \in \N \}
+\end{align*}
+Let the function $f: G \rightarrow X$ be defined as $f(x) = a^x$. Then the group $(G, +)$, the hidden subgroup $K$, the set $X$ and the function $f: G \rightarrow X$ form an instance of Fin-Ab-HSP whose solution is $\{r\}$.
+\end{lemma}
+\begin{proof}
+$(\Z, +)$ is an Abelian group since $+$ is commutative, and is finitely-generated with generator set $\{1\}$. Let $x, y \in \Z$ such that $x+K$ and $y+K$ and distinct (hence disjoint) cosets of $K$. Then the following hold:
+\begin{align*}
+    f(x+K) &= \{f(x + kr) : k \in \N\}\\
+    &= \{a^{x+kr} : k \in \N\}\\
+    &= \{a^x (a^r)^k : k \in \N\}\\
+    &= \{a^x (1)^k : k \in \N\}\\
+    &= \{a^x\}\\\\
+    f(x+K) \cap f(y+K) &= \{a^x\} \cap \{a^y\}\\
+    &= \emptyset
+\end{align*}
+The first equation shows that $f$ maps each coset to a single element, while the second equation shows that $f$ maps distinct cosets to distinct values, thus proving that this is indeed an instance of Fin-Ab-HSP. Furthermore, $K$ has generator set $\{r\}$, so $\{r\}$ will be the solution of this Fin-Ab-HSP instance.
+\end{proof}
+
+\subsection{Discrete Logarithm as a Fin-Ab-HSP Instance}
+\paragraph{}
+We give a method to construct a Fin-Ab-HSP instance for the discrete logarithm problem using a single additional call to a Fin-Ab-HSP oracle. This construction is taken from Figure 5.5 of \cite{nielsen2002quantum}.
+
+\begin{lemma}\label{hsp_for_discrete_log}
+Suppose $N \in \N$ and $a, b \in \Z_N$ such that $\exists s \in \Z_p\:[b = a^s]$. Determine $r = \inf \{r \in \N: a^r \equiv 1 \pmod{N}\}$ by solving the order finding problem (reduce to Fin-Ab-HSP and call the oracle). Let $l \in \Z_r$ and define the following:
+\begin{align*}
+    G &= \Z_r \times \Z_r\\
+    K &= (l, -ls)\Z_r\\
+    X &= \{a^j : j \in \N \}
+\end{align*}
+Let the function $f: G \rightarrow X$ be defined as $f(x, y) = a^{sx + y} \mod{N}$. Then the group $(G, +)$, the hidden subgroup $K$, the set $X$ and the function $f: G \rightarrow X$ form an instance of Fin-Ab-HSP whose solution is $\{l, -ls\}$.
+\end{lemma}
+\begin{proof}
+$(\Z_r \times \Z_r, +)$ is an Abelian group since $+$ is commutative. Since $(\Z_r \times \Z_r, +)$ is a finite Abelian group, by the classification theorem for finite Abelian groups it is isomorphic to a finite product of finitely generated groups and hence itself finitely generated. Let $\alpha = (\alpha_0, \alpha_1), \beta = (\beta_0, \beta_1) \in \Z_r \times \Z_r$ such that $\alpha + K$ and $\beta + K$ and distinct (hence disjoint) cosets of $K$. Then the following hold:
+\begin{align*}
+    f(\alpha + K) &= \{f(\alpha_0 + lx, \alpha_1 - lsx) \pmod{N} : x \in \Z_r \}\\
+    &= \{a^{s(\alpha_0 + lx) + (\alpha_1 - lsx)} \pmod{N} : x \in \Z_r \}\\
+    &= \{a^{s\alpha_0 + lsx + \alpha_1 - lsx} \pmod{N} : x \in \Z_r \}\\
+    &= \{a^{s\alpha_0 + \alpha_1} \pmod{N} \}\\\\
+    f(\alpha+K) \cap f(\beta+K) &= \{a^{s\alpha_0 + \alpha_1} \pmod{N}\} \cap \{a^{s\beta + \beta} \pmod{N}\}\\
+    &= \{f(\alpha_0, \alpha_1)\} \cap \{f(\beta_0, \beta_1)\}\\
+    &= \emptyset
+\end{align*}
+The second equation holds because $f(x + l, y - ls) = a^{s(x+l) + (y - ls)} = a^{sx + ls + y - ls} = a^{sx + y} = f(x, y)$, so $f$ maps two domain points to the same codomain point if and only if the two domain points belong to the same coset of $K$.
+
+The first equation shows that $f$ maps each coset to a single element, while the second equation shows that $d$ maps distinct cosets to distinct values, thus proving that this is indeed an instance of Fin-Ab-HSP. $K$ has generator set $\{l, -ls\}$, so $\{l, -ls\}$ will be the solution of this Fin-Ab-HSP instance.
+\end{proof}
+
+\paragraph{}
+After solving the Fin-Ab-HSP instance for $\{l, -ls\}$, one can easily compute $s$, solving the discrete logarithm problem. Note that the extra Fin-Ab-HSP oracle call does not increase the hardness of the problem beyond the hardness of Fin-Ab-HSP.
+
+\subsection{Efficient Quantum Algorithms for Fin-Ab-HSP}
+\paragraph{}
+We have seen that the integer factorisation problem and the discrete logarithm problem can both be reduced to Fin-Ab-HSP. Unfortunately, a class of efficient algorithms cleverly making use of the quantum Fourier transform was presented in \cite{shor1994algorithms} to solve Fin-Ab-HSP on quantum computers in polynomial time, thus breaking cryptosystems whose hardness is based on those problems.
+
+\paragraph{}
+These algorithms, together with significant progress made in constructing physical quantum computers, make it necessary for new cryptosystems to be created that are secure against adversaries armed with quantum computers.
+
+\section{A Post-Quantum Cryptosystem} \label{mersennekem_intro}
+\paragraph{}
+In this report, we give a modified version of the Mersenne-prime based key-exchange protocol in \cite{aggarwal2018new}, thought to be secure against quantum computers, and experimentally determine a suitable algorithm for a major subprocedure that is required in the cryptosystem.
+
+\paragraph{}
+In this section, we give a brief description of how the cryptosystem is expected to work, deferring a full description and analysis to Chapter \ref{description_chapter}.
+
+\paragraph{}
+Let $p = 2^n - 1$ be a Mersenne prime and let $\ham_h^n$ be the set of all $n$-bit strings with Hamming weight $h$. We take $n$ and $h$ to be fixed parameters of this cryptosystem. We identify the set of bitstrings $\F_2^n$ with the finite field $\F_p$, identifying both $0^n$ and $1^n$ in $\F_2^n$ with $0 \in \F_p$ and taking all arithmetic operations on $n$-bit strings with respect to $\F_p$.
+
+\paragraph{}
+We assume that Bob has a private key $(F,G) \in \ham_h^n \times \ham_h^n$ with a corresponding public key $H = \frac{F}{G}$. We assume that there is a publicly known randomness extractor (e.g. a hash function) $Ext: \ham_h^n \times \ham_h^n \rightarrow \F_2^\lambda$, for some $\lambda \in \N$.
+
+\paragraph{}
+Suppose Alice wishes to share a message $m \in \F_2^\lambda$ with Bob over an insecure channel. The idea is that Alice generates two random strings $A, B \in \ham_h^n$ and sends $(C, c) = (AH + B, Ext(A, B) \oplus m)$ to Bob.
+
+\paragraph{}
+Bob's task, having received $(C, c)$, is to recover the message $m$. Using his private key $G$, Bob first computes $D = CG = AF + BG$. Bob now needs to compute $(A, B)$ given $D$. We experimentally deduce an algorithm in Chapter \ref{correctness_chapter} to do this. After Bob obtains $(A, B)$, he obtains the message by computing $Ext(A, B) \oplus c = m$.
+
+\section{Our Work}
+\paragraph{}
+THis FYP is focused on the cryptosystem described in Section \ref{mersennekem_intro}. In particular, we present the following:
+\begin{itemize}
+    \item an experimentally-determined message extraction algorithm to obtain $(A, B)$ from $D = AF + BG$
+    \item an implementation of the cryptosystem with this message extraction algorithm
+    \item analysis of the correctness, efficiency and security of the cryptosystem
+\end{itemize}
+
+
+\section{Structure of this Report}
+\paragraph{}
+This report is split into 5 chapters.
+
+\paragraph{}
+In Chapter 1 (this chapter), we explain why post-quantum cryptography is needed, give a proposal for a a post-quantum cryptosystem based on an existing one defined in \cite{aggarwal2018new} and explain our tasks and contributions.
+
+\paragraph{}
+In Chapter 2, we give preliminaries and definitions used throughout the rest of this report (and even in Chapter 1).
+
+\paragraph{}
+In Chapter 3, we experimentally determine an algorithm to extract $(A, B) \in \ham_h^n \times \ham_h^n$ given $D = AF + BG$ (where $F, G \in \ham_h^n$). This is an essential part of the cryptosystem. We give justifications as to the correctness of the algorithm from experimental data.
+
+\paragraph{}
+In Chapter 4, we define the cryptosystem proper. We give assumptions and justifications for the security and efficiency of the cryptosystem.
+
+\paragraph{}
+In Chapter 5, we give some implementation details of the cryptosystem and our concluding remarks.

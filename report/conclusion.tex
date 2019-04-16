@@ -1,0 +1,23 @@
+\section{Tasks Accomplished}
+\paragraph{}
+In this report, we have presented MersennePKC, a modified version of the cryptosystem given in \cite{aggarwal2018new}. We have experimentally determined an algorithm for an essential part of MersennePKC and given justification for its correctness, efficiency and security.
+
+\paragraph{}
+We have also implemented MersennePKC: the implemented code is available at \url{https://github.com/thenaesh/mersenne-pkc/} and is written in Rust (compiler version 1.34.0, nightly build at the time of writing). The implementation provides a library for performing encryption and decryption with MersennePKC, together with utilities that were used to generate the graphs in Chapter 3 and a sample program to demonstrate a proof of concept encryption and decryption.
+
+\paragraph{}
+We tested the proof of concept on an Intel Core i7-4770MQ machine (with 4 physical cores and 8 virtual cores) running Linux Mint 19.1 and measured the time taken to run a full sequence of key generation, encryption and decryption. We observed that the entire sequence took approximately $0.8$s, making the MersennePKC implementation feasible for real-world use.
+
+\section{Improvements and Future Work}
+\paragraph{}
+There remains areas for improvement, however. Throughout this report, we have made several assumptions, such as Assumption \ref{assumpt_pubkey_appears_uniform} and Assumption \ref{assumpt_extracted_value_appears_uniform}, in order to complete the proofs. The message extraction algorithm in Chapter 3 also required an experimental investigation to determine. Ideally, we would like to prove these assumptions and prove the correctness of the message extraction algorithm in Chapter 3 if possible.
+
+\paragraph{}
+With regards to the implementation, though we have demonstrated that MersennePKC is fast enough for real-world use, it is not yet sufficiently hardened for real-world use and is vulnerable to various side-channel attacks. We hope to harden the implementation in the future so that it may actually be used for real-world cryptography.
+
+\section{Concluding Remarks}
+\paragraph{}
+We have presented a post-quantum cryptosystem based on the hardness of distinguishing quotients of two numbers with low Hamming weight in a field of Mersenne prime order. There are other approaches to post-quantum cryptography, such as lattice-based cryptosystems based on the hardness of finding short vectors in a lattice \cite{regev2009lattices}.
+
+\paragraph{}
+All of these approaches to post-quantum cryptography are in their infancy, but research into post-quantum cryptosystems are a necessity due to the possibility of feasible quantum computers becoming available to adversaries in the near future.

@@ -1,0 +1,77 @@
+\documentclass[12pt]{report}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{xfrac}
+\usepackage{amsthm}
+\usepackage{apacite}
+\usepackage{tikz}
+\usepackage{complexity}
+\usepackage{graphicx}
+\usepackage{listings}
+
+\graphicspath{ {./img/} }
+
+\title{Implementation of a Key-Exchange Protocol Based on Mersenne Primes}
+\author{Thenaesh Elango}
+\date{March 2019}
+
+ 
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{claim}{Claim}[section]
+\newtheorem{assumption}{Assumption}[section]
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\ham}{\mathcal{H}}
+\newcommand{\freq}[1]{\mathcal{F}_{#1}}
+
+\lstset{numbers=left}
+
+
+\linespread{1.25}
+\begin{document}
+\begin{titlepage} \centering B. Comp. Dissertation\par \vfill {\huge\bfseries MersennePKC \par {\Large A public-key cryptosystem based on Mersenne primes} \par} \vfill {\Large by \par Thenaesh Elango\par} \vfill { \doublespacing Department of Computer Science \\ School of Computing \\ National University of Singapore \\ \vspace{\baselineskip} 2018/2019 \\ } \end{titlepage} \begin{titlepage} \centering B. Comp. Dissertation\par \vfill {\huge\bfseries MersennePKC \par {\Large A public-key cryptosystem based on Mersenne primes} \par} \vfill {\Large by \par Thenaesh Elango\par} \vfill { \doublespacing Department of Computer Science \\ School of Computing \\ National University of Singapore \\ \vspace{\baselineskip} 2018/2019 \\ } \vfill { \begin{flushleft} Project No: H216040 \\ Supervisor: Asst. Prof. Divesh Aggarwal \\ Co-Supervisor: Prof. Frank Stephan \\ \hfill\\ Deliverables: \\ \qquad\qquad Report: 1 Volume \end{flushleft} } \end{titlepage}
+
+
+\begin{abstract}
+    With quantum computers soon becoming a reality, classical cryptosystems will soon no longer be viable. It is thus necessary to create new post-quantum cryptosystems that are secure against adversaries with quantum computers. We present MersennePKC, a cryptosystem adapted from \cite{aggarwal2018new} and thought to be secure against quantum computers. We experimentally determine essential subprocedures for MersennePKC and give justification for its correctness, efficiency and security.
+\end{abstract}
+
+\newpage
+\begin{center}
+    \underline{\textbf{Acknowledgements}}
+\end{center}
+I would like to convey my sincere thanks and appreciation to my FYP supervisor Asst. Prof. Divesh Aggarwal for all the assistance he has rendered me over the course of this project. I would also like to thank him for introducing me to the world of computational complexity when he taught me CS5230 in AY17/18.
+
+\paragraph{}
+I would also like to thank my co-supervisor Prof. Frank Stephan for the insightful weekly meetings and comments on the project.
+\newpage
+
+\tableofcontents
+
+
+\chapter{Introduction}
+\input{introduction.tex}
+
+\chapter{Preliminaries \& Definitions}
+\input{preliminaries.tex}
+
+\chapter{Message Extraction}\label{correctness_chapter}
+\input{experiment.tex}
+
+\chapter{Public Key Cryptosystem}\label{description_chapter}
+\input{cryptosystem.tex}
+
+\chapter{Conclusion}
+\input{conclusion.tex}
+
+
+\bibliographystyle{apacite}
+\bibliography{references.bib}
+
+\end{document}
