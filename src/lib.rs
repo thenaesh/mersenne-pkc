@@ -15,6 +15,10 @@ pub type PrivateKey = (BitField, BitField);
 pub type PlainText = (BitField, BitField);
 pub type CipherText = BitField;
 
+/*
+ * Gets the proper experimentally-determined parameters for each value of n and h
+ * Fully defined only for n = 86243, h = 128 for now, but may be extended in the future
+ */
 pub fn get_threshold_for_parameters(n: usize, h: usize, n_iter: usize) -> i64 {
     match (n, h, n_iter) {
         (44497, 64, 0) => 50, // used only for plotting graphs
@@ -25,7 +29,11 @@ pub fn get_threshold_for_parameters(n: usize, h: usize, n_iter: usize) -> i64 {
     }
 }
 
-pub fn extract_session_key((a, b): &PlainText) -> String {
+/*
+ * Takes (A, B) as input and computes Ext(A, B)
+ * The extractor used is the inner product extractor.
+ */
+pub fn extract_128_bit_key((a, b): &PlainText) -> String {
     let a = a.as_sparse();
     let b = b.as_sparse();
 
@@ -72,6 +80,9 @@ pub fn extract_session_key((a, b): &PlainText) -> String {
     format!("{:x}", innerpdt)
 }
 
+/*
+ * Randomly chooses (A, B)
+ */
 pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
     let a = BitField::new_uniform_random(n, h);
     let b = BitField::new_uniform_random(n, h);
@@ -79,6 +90,9 @@ pub fn randomly_generate_message(n: usize, h: usize) -> PlainText {
     (a, b)
 }
 
+/*
+ * Computes A*H+B given (A, B) and public key H
+ */
 pub fn encrypt(m: PlainText, pub_key: PublicKey) -> CipherText {
     let (a, b) = m;
     let mut c = pub_key;
@@ -88,6 +102,10 @@ pub fn encrypt(m: PlainText, pub_key: PublicKey) -> CipherText {
     c
 }
 
+/*
+ * Computes (A, B) with high probability given AH+B and corresponding private key (F, G)
+ * where H = F/G
+ */
 pub fn decrypt(c: CipherText, pri_key: PrivateKey, n: usize, h: usize) -> PlainText {
     let start_time = SystemTime::now();
     let n = c.len();
